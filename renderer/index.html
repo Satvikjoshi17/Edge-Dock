@@ -6,7 +6,7 @@
   <title>EdgeDock</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body id="dock-body">
 
   <aside id="rail" class="cyber-rail">
     <!-- Header Controls -->
@@ -27,6 +27,9 @@
     <div class="rail-footer">
       <button id="toggle-autohide-btn" class="action-btn" title="Toggle Auto-Hide">
         <svg viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+      </button>
+      <button id="open-settings-btn" class="action-btn" title="Dock Preferences">
+        <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
       </button>
     </div>
   </aside>
@@ -54,6 +57,58 @@
         <button type="submit" id="save-btn" class="btn-primary">Save Pin</button>
       </div>
     </form>
+  </div>
+
+  <!-- Settings Drawer -->
+  <div id="settings-drawer" class="dock-drawer">
+    <div class="drawer-title">Preferences</div>
+    <div class="settings-content">
+      <div class="form-group">
+        <label>Dock Screen Position</label>
+        <div class="segmented-control">
+          <button type="button" class="segment-btn active" data-position="right">Right Edge</button>
+          <button type="button" class="segment-btn" data-position="left">Left Edge</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Cyber Theme Accent</label>
+        <div class="color-picker-row">
+          <button type="button" class="color-dot active" data-color="#00f2fe" style="background: #00f2fe;" title="Cyan Neon"></button>
+          <button type="button" class="color-dot" data-color="#b537f2" style="background: #b537f2;" title="Synthwave Violet"></button>
+          <button type="button" class="color-dot" data-color="#ffd32a" style="background: #ffd32a;" title="Cyber Yellow"></button>
+          <button type="button" class="color-dot" data-color="#05c46b" style="background: #05c46b;" title="Matrix Emerald"></button>
+          <button type="button" class="color-dot" data-color="#ff3f8b" style="background: #ff3f8b;" title="Pulse Crimson"></button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="hotkey-input">Global Shortcut</label>
+        <div class="form-input-row">
+          <input type="text" id="hotkey-input" class="form-input" value="Alt+Space" />
+          <button type="button" id="save-hotkey-btn" class="browse-btn">Apply</button>
+        </div>
+      </div>
+
+      <div class="form-group checkbox-row">
+        <label class="switch-label">
+          <span>Launch on Windows Startup</span>
+          <input type="checkbox" id="launch-boot-switch" />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="form-group checkbox-row">
+        <label class="switch-label">
+          <span>Auto-Hide on Inactivity</span>
+          <input type="checkbox" id="autohide-switch" />
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+    <div class="drawer-actions">
+      <button type="button" id="close-settings-btn" class="btn-primary">Done</button>
+    </div>
   </div>
 
   <!-- Right-Click Context Menu -->

@@ -7,18 +7,28 @@ const SVG_ICONS = {
 };
 
 let shortcuts = [];
-let currentSettings = { autoHide: false };
+let currentSettings = {
+  dockPosition: 'right',
+  autoHide: false,
+  hotkey: 'Alt+Space',
+  launchOnBoot: true,
+  accentColor: '#00f2fe'
+};
+
 let activeContextMenuTarget = null;
 let draggedItemIndex = null;
 let temporaryPickedIcon = null;
 
 // DOM Elements
+const bodyEl = document.getElementById('dock-body');
 const rail = document.getElementById('rail');
 const listContainer = document.getElementById('launcher-list');
 const toggleAddBtn = document.getElementById('toggle-add-btn');
 const toggleAutoHideBtn = document.getElementById('toggle-autohide-btn');
+const openSettingsBtn = document.getElementById('open-settings-btn');
 const closeBtn = document.getElementById('close-btn');
 
+// Add/Edit Drawer
 const drawer = document.getElementById('drawer');
 const drawerTitle = document.getElementById('drawer-title');
 const shortcutForm = document.getElementById('shortcut-form');
@@ -28,6 +38,17 @@ const appPathInput = document.getElementById('app-path');
 const browseBtn = document.getElementById('browse-btn');
 const cancelBtn = document.getElementById('cancel-btn');
 
+// Settings Drawer
+const settingsDrawer = document.getElementById('settings-drawer');
+const segmentBtns = document.querySelectorAll('.segment-btn');
+const colorDots = document.querySelectorAll('.color-dot');
+const hotkeyInput = document.getElementById('hotkey-input');
+const saveHotkeyBtn = document.getElementById('save-hotkey-btn');
+const launchBootSwitch = document.getElementById('launch-boot-switch');
+const autohideSwitch = document.getElementById('autohide-switch');
+const closeSettingsBtn = document.getElementById('close-settings-btn');
+
+// Context Menu & Toast
 const contextMenu = document.getElementById('context-menu');
 const ctxLaunch = document.getElementById('ctx-launch');
 const ctxReveal = document.getElementById('ctx-reveal');
@@ -38,9 +59,10 @@ const toastEl = document.getElementById('toast');
 async function init() {
   if (window.dockAPI) {
     shortcuts = (await window.dockAPI.getShortcuts()) || [];
-    currentSettings = (await window.dockAPI.getSettings()) || { autoHide: false };
+    const savedSettings = await window.dockAPI.getSettings();
+    if (savedSettings) currentSettings = { ...currentSettings, ...savedSettings };
   }
-  updateAutoHideButtonState();
+  applySettings(currentSettings);
   await loadMissingIcons();
   renderShortcuts();
 }
@@ -53,17 +75,82 @@ function showToast(message) {
   }, 2600);
 }
 
-function updateAutoHideButtonState() {
-  if (currentSettings.autoHide) {
+function applySettings(settings) {
+  // 1. Accent Color
+  if (settings.accentColor) {
+    document.documentElement.style.setProperty('--accent', settings.accentColor);
+    const hex = settings.accentColor.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16) || 0;
+    const g = parseInt(hex.substring(2, 4), 16) || 242;
+    const b = parseInt(hex.substring(4, 6), 16) || 254;
+    document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.4)`);
+    document.documentElement.style.setProperty('--border-color', `rgba(${r}, ${g}, ${b}, 0.22)`);
+
+    colorDots.forEach((dot) => {
+      dot.classList.toggle('active', dot.dataset.color.toLowerCase() === settings.accentColor.toLowerCase());
+    });
+  }
+
+  // 2. Dock Position
+  if (settings.dockPosition === 'left') {
+    bodyEl.classList.add('dock-left');
+  } else {
+    bodyEl.classList.remove('dock-left');
+  }
+  segmentBtns.forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.position === settings.dockPosition);
+  });
+
+  // 3. Auto-Hide state
+  if (settings.autoHide) {
+    bodyEl.classList.add('autohide-active');
     toggleAutoHideBtn.classList.add('active');
     toggleAutoHideBtn.title = 'Auto-Hide: Enabled (Click to Pin)';
+    autohideSwitch.checked = true;
   } else {
+    bodyEl.classList.remove('autohide-active');
+    rail.classList.remove('peek-hidden');
     toggleAutoHideBtn.classList.remove('active');
     toggleAutoHideBtn.title = 'Auto-Hide: Disabled (Click to Enable)';
+    autohideSwitch.checked = false;
+  }
+
+  // 4. Hotkey
+  if (settings.hotkey) {
+    hotkeyInput.value = settings.hotkey;
+  }
+
+  // 5. Startup Launch
+  launchBootSwitch.checked = Boolean(settings.launchOnBoot);
+}
+
+// Window expansion management for tooltips, drawers, and menus
+function checkWindowExpansion() {
+  const isDrawerOpen = drawer.classList.contains('open') || settingsDrawer.classList.contains('open');
+  const isContextMenuOpen = contextMenu.classList.contains('visible');
+  const isHovered = rail.matches(':hover');
+
+  const shouldExpand = isDrawerOpen || isContextMenuOpen || isHovered;
+  if (window.dockAPI) {
+    window.dockAPI.setExpanded(shouldExpand);
   }
 }
 
-// Pre-fetch native icons for file paths
+rail.addEventListener('mouseenter', () => {
+  if (currentSettings.autoHide) {
+    rail.classList.remove('peek-hidden');
+  }
+  checkWindowExpansion();
+});
+
+rail.addEventListener('mouseleave', () => {
+  if (currentSettings.autoHide && !drawer.classList.contains('open') && !settingsDrawer.classList.contains('open')) {
+    rail.classList.add('peek-hidden');
+  }
+  checkWindowExpansion();
+});
+
+// Pre-fetch native icons for local files
 async function loadMissingIcons() {
   if (!window.dockAPI) return;
   let changed = false;
@@ -84,7 +171,7 @@ async function loadMissingIcons() {
 }
 
 function getIconElement(item) {
-  // 1. Native cached icon
+  // 1. Cached native icon
   if (item.iconData) {
     const img = document.createElement('img');
     img.src = item.iconData;
@@ -108,7 +195,7 @@ function getIconElement(item) {
     }
   }
 
-  // 3. Fallback SVGs by known keyword
+  // 3. Fallback SVGs
   const lower = item.path.toLowerCase();
   if (lower.includes('code')) return createSvgElement(SVG_ICONS.code);
   if (lower.includes('wt') || lower.includes('cmd') || lower.includes('terminal') || lower.includes('powershell')) {
@@ -140,7 +227,7 @@ function renderShortcuts() {
     const iconEl = getIconElement(item);
     tile.appendChild(iconEl);
 
-    // Click to launch
+    // Launch shortcut
     tile.addEventListener('click', async () => {
       if (window.dockAPI) {
         const result = await window.dockAPI.launchTarget(item.path);
@@ -150,7 +237,7 @@ function renderShortcuts() {
       }
     });
 
-    // Right click for context menu
+    // Right-click context menu
     tile.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       showContextMenu(e.clientX, e.clientY, item);
@@ -252,7 +339,7 @@ rail.addEventListener('drop', async (e) => {
         id: Date.now().toString() + Math.random().toString(36).substring(2, 6),
         name: displayName,
         path: file.path,
-        iconData: iconData
+        iconData
       });
     }
 
@@ -268,10 +355,16 @@ rail.addEventListener('drop', async (e) => {
 function showContextMenu(x, y, item) {
   activeContextMenuTarget = item;
   contextMenu.style.top = `${Math.min(y, window.innerHeight - 150)}px`;
-  contextMenu.style.right = '74px';
+  if (currentSettings.dockPosition === 'left') {
+    contextMenu.style.left = '76px';
+    contextMenu.style.right = 'auto';
+  } else {
+    contextMenu.style.right = '76px';
+    contextMenu.style.left = 'auto';
+  }
   contextMenu.classList.add('visible');
+  checkWindowExpansion();
 
-  // Disable reveal for web links
   if (item.path.startsWith('http')) {
     ctxReveal.style.display = 'none';
   } else {
@@ -282,6 +375,7 @@ function showContextMenu(x, y, item) {
 function hideContextMenu() {
   contextMenu.classList.remove('visible');
   activeContextMenuTarget = null;
+  checkWindowExpansion();
 }
 
 document.addEventListener('click', (e) => {
@@ -290,6 +384,9 @@ document.addEventListener('click', (e) => {
   }
   if (!drawer.contains(e.target) && !toggleAddBtn.contains(e.target)) {
     closeDrawer();
+  }
+  if (!settingsDrawer.contains(e.target) && !openSettingsBtn.contains(e.target)) {
+    closeSettings();
   }
 });
 
@@ -331,6 +428,7 @@ ctxDelete.addEventListener('click', async () => {
 
 // Drawer Functions
 function openDrawer(itemToEdit = null) {
+  closeSettings();
   if (itemToEdit) {
     drawerTitle.textContent = 'Edit Shortcut';
     itemIdInput.value = itemToEdit.id;
@@ -345,12 +443,25 @@ function openDrawer(itemToEdit = null) {
     temporaryPickedIcon = null;
   }
   drawer.classList.add('open');
+  checkWindowExpansion();
   appNameInput.focus();
 }
 
 function closeDrawer() {
   drawer.classList.remove('open');
   temporaryPickedIcon = null;
+  checkWindowExpansion();
+}
+
+function openSettings() {
+  closeDrawer();
+  settingsDrawer.classList.add('open');
+  checkWindowExpansion();
+}
+
+function closeSettings() {
+  settingsDrawer.classList.remove('open');
+  checkWindowExpansion();
 }
 
 toggleAddBtn.addEventListener('click', () => {
@@ -361,9 +472,18 @@ toggleAddBtn.addEventListener('click', () => {
   }
 });
 
-cancelBtn.addEventListener('click', closeDrawer);
+openSettingsBtn.addEventListener('click', () => {
+  if (settingsDrawer.classList.contains('open')) {
+    closeSettings();
+  } else {
+    openSettings();
+  }
+});
 
-// File Browse Picker
+cancelBtn.addEventListener('click', closeDrawer);
+closeSettingsBtn.addEventListener('click', closeSettings);
+
+// Native File Browse Picker
 browseBtn.addEventListener('click', async () => {
   if (window.dockAPI) {
     const selected = await window.dockAPI.selectFile();
@@ -392,7 +512,6 @@ shortcutForm.addEventListener('submit', async (e) => {
   }
 
   if (id) {
-    // Edit existing
     const existing = shortcuts.find((s) => s.id === id);
     if (existing) {
       existing.name = name;
@@ -401,7 +520,6 @@ shortcutForm.addEventListener('submit', async (e) => {
     }
     showToast('Shortcut updated');
   } else {
-    // Add new
     shortcuts.push({
       id: Date.now().toString(),
       name,
@@ -425,7 +543,63 @@ toggleAutoHideBtn.addEventListener('click', async () => {
   if (window.dockAPI) {
     await window.dockAPI.saveSettings(currentSettings);
   }
-  updateAutoHideButtonState();
+  applySettings(currentSettings);
+  showToast(currentSettings.autoHide ? 'Auto-Hide Enabled' : 'Dock Pinned');
+});
+
+// Settings: Position
+segmentBtns.forEach((btn) => {
+  btn.addEventListener('click', async () => {
+    currentSettings.dockPosition = btn.dataset.position;
+    if (window.dockAPI) {
+      await window.dockAPI.saveSettings(currentSettings);
+    }
+    applySettings(currentSettings);
+    showToast(`Dock moved to ${currentSettings.dockPosition} edge`);
+  });
+});
+
+// Settings: Color Picker
+colorDots.forEach((dot) => {
+  dot.addEventListener('click', async () => {
+    currentSettings.accentColor = dot.dataset.color;
+    if (window.dockAPI) {
+      await window.dockAPI.saveSettings(currentSettings);
+    }
+    applySettings(currentSettings);
+    showToast('Theme accent applied');
+  });
+});
+
+// Settings: Hotkey
+saveHotkeyBtn.addEventListener('click', async () => {
+  const hotkey = hotkeyInput.value.trim();
+  if (hotkey && window.dockAPI) {
+    const success = await window.dockAPI.updateHotkey(hotkey);
+    if (success) {
+      currentSettings.hotkey = hotkey;
+      showToast(`Hotkey set to ${hotkey}`);
+    } else {
+      showToast('Hotkey invalid or reserved');
+    }
+  }
+});
+
+// Settings: Switches
+launchBootSwitch.addEventListener('change', async (e) => {
+  currentSettings.launchOnBoot = e.target.checked;
+  if (window.dockAPI) {
+    await window.dockAPI.setLoginItem(currentSettings.launchOnBoot);
+  }
+  showToast(currentSettings.launchOnBoot ? 'Auto-Launch on Boot enabled' : 'Auto-Launch on Boot disabled');
+});
+
+autohideSwitch.addEventListener('change', async (e) => {
+  currentSettings.autoHide = e.target.checked;
+  if (window.dockAPI) {
+    await window.dockAPI.saveSettings(currentSettings);
+  }
+  applySettings(currentSettings);
   showToast(currentSettings.autoHide ? 'Auto-Hide Enabled' : 'Dock Pinned');
 });
 

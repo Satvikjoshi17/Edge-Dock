@@ -12,10 +12,12 @@ if (!gotTheLock) {
 
 let mainWindow = null;
 let isVisible = true;
+let isExpanded = false;
 let tray = null;
 let store = null;
 
 const DOCK_WIDTH = 68;
+const EXPANDED_WIDTH = 340;
 
 const defaultShortcuts = [
   { id: '1', name: 'VS Code', path: 'code', iconType: 'svg', icon: 'code' },
@@ -27,7 +29,8 @@ const defaultSettings = {
   dockPosition: 'right', // 'right' | 'left'
   autoHide: false,
   hotkey: 'Alt+Space',
-  launchOnBoot: true
+  launchOnBoot: true,
+  accentColor: '#00f2fe'
 };
 
 function getSettings() {
@@ -35,17 +38,19 @@ function getSettings() {
   return { ...defaultSettings, ...(store.get('settings') || {}) };
 }
 
-function updateWindowBounds() {
+function updateWindowBounds(expanded = isExpanded) {
   if (!mainWindow) return;
+  isExpanded = expanded;
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.workAreaSize;
   const settings = getSettings();
+  const targetWidth = isExpanded ? EXPANDED_WIDTH : DOCK_WIDTH;
 
-  const x = settings.dockPosition === 'left' ? 0 : width - DOCK_WIDTH;
+  const x = settings.dockPosition === 'left' ? 0 : width - targetWidth;
   mainWindow.setBounds({
     x,
     y: 0,
-    width: DOCK_WIDTH,
+    width: targetWidth,
     height
   });
 }
@@ -78,9 +83,9 @@ function createSidebar() {
   mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
 
   // Multi-monitor and resolution change listeners
-  screen.on('display-metrics-changed', updateWindowBounds);
-  screen.on('display-added', updateWindowBounds);
-  screen.on('display-removed', updateWindowBounds);
+  screen.on('display-metrics-changed', () => updateWindowBounds(isExpanded));
+  screen.on('display-added', () => updateWindowBounds(isExpanded));
+  screen.on('display-removed', () => updateWindowBounds(isExpanded));
 
   // Hide instead of close
   mainWindow.on('close', (event) => {
@@ -97,8 +102,27 @@ function createSidebar() {
     if (currentSettings.autoHide && isVisible && mainWindow) {
       mainWindow.hide();
       isVisible = false;
+      isExpanded = false;
     }
   });
+}
+
+function registerHotkey(newHotkey) {
+  globalShortcut.unregisterAll();
+  const hotkey = newHotkey || getSettings().hotkey || 'Alt+Space';
+  try {
+    const registered = globalShortcut.register(hotkey, () => {
+      toggleSidebar();
+    });
+    if (!registered) {
+      console.warn(`Global shortcut ${hotkey} registration failed.`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Failed to register global hotkey:', err);
+    return false;
+  }
 }
 
 function createTray() {
@@ -130,20 +154,28 @@ function createTray() {
         checked: settings.autoHide,
         click: () => {
           const next = !settings.autoHide;
-          store.set('settings.autoHide', next);
+          settings.autoHide = next;
+          store.set('settings', settings);
+          if (mainWindow) {
+            mainWindow.webContents.send('settings-updated', settings);
+          }
           rebuildContextMenu();
         }
       },
       {
-        label: `Dock Position: ${settings.dockPosition === 'left' ? 'Left' : 'Right'}`,
+        label: `Dock Position: ${settings.dockPosition === 'left' ? 'Left Edge' : 'Right Edge'}`,
         submenu: [
           {
             label: 'Right Side',
             type: 'radio',
             checked: settings.dockPosition === 'right',
             click: () => {
-              store.set('settings.dockPosition', 'right');
-              updateWindowBounds();
+              settings.dockPosition = 'right';
+              store.set('settings', settings);
+              updateWindowBounds(isExpanded);
+              if (mainWindow) {
+                mainWindow.webContents.send('settings-updated', settings);
+              }
               rebuildContextMenu();
             }
           },
@@ -152,8 +184,12 @@ function createTray() {
             type: 'radio',
             checked: settings.dockPosition === 'left',
             click: () => {
-              store.set('settings.dockPosition', 'left');
-              updateWindowBounds();
+              settings.dockPosition = 'left';
+              store.set('settings', settings);
+              updateWindowBounds(isExpanded);
+              if (mainWindow) {
+                mainWindow.webContents.send('settings-updated', settings);
+              }
               rebuildContextMenu();
             }
           }
@@ -184,8 +220,9 @@ function toggleSidebar() {
   if (isVisible) {
     mainWindow.hide();
     isVisible = false;
+    isExpanded = false;
   } else {
-    updateWindowBounds();
+    updateWindowBounds(false);
     mainWindow.show();
     mainWindow.focus();
     isVisible = true;
@@ -212,7 +249,6 @@ app.whenReady().then(async () => {
     }
   });
 
-  // Only enable OS auto-launch when packaged to protect development environment
   if (app.isPackaged) {
     const settings = getSettings();
     app.setLoginItemSettings({
@@ -223,20 +259,7 @@ app.whenReady().then(async () => {
 
   createSidebar();
   createTray();
-
-  // Register Global Hotkey safely
-  const settings = getSettings();
-  const hotkey = settings.hotkey || 'Alt+Space';
-  try {
-    const registered = globalShortcut.register(hotkey, () => {
-      toggleSidebar();
-    });
-    if (!registered) {
-      console.warn(`Global shortcut ${hotkey} registration failed. It may be reserved by another app.`);
-    }
-  } catch (err) {
-    console.error('Failed to register global hotkey:', err);
-  }
+  registerHotkey();
 });
 
 // IPC: Safe target launch
@@ -264,7 +287,6 @@ ipcMain.handle('launch-target', async (event, targetPath) => {
     }
 
     // 3. Recognized command line tools (e.g., 'code', 'wt', 'cmd')
-    // Spawn directly without shell interpolation to eliminate command injection
     const child = spawn(trimmed, [], {
       detached: true,
       stdio: 'ignore',
@@ -282,6 +304,38 @@ ipcMain.handle('launch-target', async (event, targetPath) => {
   }
 });
 
+// IPC: Window Expand / Collapse for flyouts and drawers
+ipcMain.on('set-expanded', (event, expanded) => {
+  updateWindowBounds(Boolean(expanded));
+});
+
+// IPC: Hotkey Update
+ipcMain.handle('update-hotkey', (event, hotkey) => {
+  const success = registerHotkey(hotkey);
+  if (success && store) {
+    const settings = getSettings();
+    settings.hotkey = hotkey;
+    store.set('settings', settings);
+  }
+  return success;
+});
+
+// IPC: Toggle Startup Launch
+ipcMain.handle('set-login-item', (event, enable) => {
+  if (app.isPackaged) {
+    app.setLoginItemSettings({
+      openAtLogin: Boolean(enable),
+      path: process.execPath
+    });
+  }
+  if (store) {
+    const settings = getSettings();
+    settings.launchOnBoot = Boolean(enable);
+    store.set('settings', settings);
+  }
+  return true;
+});
+
 // IPC: Native File Icon Extractor
 ipcMain.handle('get-file-icon', async (event, filePath) => {
   try {
@@ -293,7 +347,7 @@ ipcMain.handle('get-file-icon', async (event, filePath) => {
       return icon.toDataURL();
     }
   } catch (e) {
-    // Graceful fallback for non-file targets
+    // Fallback
   }
   return null;
 });
@@ -355,10 +409,10 @@ ipcMain.handle('get-settings', () => {
   return getSettings();
 });
 
-ipcMain.handle('save-settings', (event, settings) => {
-  if (store && typeof settings === 'object') {
-    store.set('settings', settings);
-    updateWindowBounds();
+ipcMain.handle('save-settings', (event, newSettings) => {
+  if (store && typeof newSettings === 'object') {
+    store.set('settings', newSettings);
+    updateWindowBounds(isExpanded);
   }
   return true;
 });
@@ -368,6 +422,7 @@ ipcMain.on('hide-window', () => {
   if (mainWindow) {
     mainWindow.hide();
     isVisible = false;
+    isExpanded = false;
   }
 });
 

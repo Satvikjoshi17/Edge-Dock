@@ -9,5 +9,8 @@ contextBridge.exposeInMainWorld('dockAPI', {
   saveShortcuts: (shortcuts) => ipcRenderer.invoke('save-shortcuts', shortcuts),
   getSettings: () => ipcRenderer.invoke('get-settings'),
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
+  setExpanded: (expanded) => ipcRenderer.send('set-expanded', expanded),
+  updateHotkey: (hotkey) => ipcRenderer.invoke('update-hotkey', hotkey),
+  setLoginItem: (enable) => ipcRenderer.invoke('set-login-item', enable),
   hideWindow: () => ipcRenderer.send('hide-window')
 });
