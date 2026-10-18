@@ -111,11 +111,21 @@ function createSidebar() {
   });
 }
 
+function sanitizeAccelerator(accel, fallback = 'Alt+Q') {
+  if (!accel || typeof accel !== 'string') return fallback;
+  const clean = accel.trim();
+  // Solitary modifiers are illegal in Electron globalShortcut
+  if (/^(shift|alt|ctrl|control|meta|command)$/i.test(clean)) {
+    return clean.toLowerCase() === 'shift' ? 'Shift+Space' : fallback;
+  }
+  return clean;
+}
+
 function registerGlobalHotkeys() {
   globalShortcut.unregisterAll();
   const settings = getSettings();
-  const mainHotkey = settings.hotkey || 'Alt+Space';
-  const quickHotkey = settings.quickHotkey || 'Alt+Q';
+  const mainHotkey = sanitizeAccelerator(settings.hotkey, 'Alt+Space');
+  const quickHotkey = sanitizeAccelerator(settings.quickHotkey, 'Alt+Q');
 
   try {
     globalShortcut.register(mainHotkey, () => {
@@ -635,6 +645,73 @@ ipcMain.on('hide-window', () => {
   if (mainWindow) {
     mainWindow.hide();
     isVisible = false;
+  }
+});
+
+// IPC: Mouse event forwarding (Pass-through for transparent regions)
+ipcMain.on('set-ignore-mouse', (event, ignore) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setIgnoreMouseEvents(Boolean(ignore), { forward: true });
+  }
+});
+
+ipcMain.on('set-expanded', (event, expanded) => {
+  // Handled via CSS drawers with fixed stable window
+});
+
+ipcMain.handle('update-hotkey', (event, hotkey) => {
+  const sanitized = sanitizeAccelerator(hotkey, 'Alt+Space');
+  try {
+    const currentSettings = getSettings();
+    if (currentSettings.hotkey) {
+      try { globalShortcut.unregister(currentSettings.hotkey); } catch {}
+    }
+    const success = globalShortcut.register(sanitized, () => {
+      toggleSidebar();
+    });
+    if (success) {
+      currentSettings.hotkey = sanitized;
+      if (store) store.set('settings', currentSettings);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error('Failed to update main hotkey:', err);
+    return false;
+  }
+});
+
+ipcMain.handle('update-quick-hotkey', (event, hotkey) => {
+  const sanitized = sanitizeAccelerator(hotkey, 'Alt+Q');
+  try {
+    const currentSettings = getSettings();
+    if (currentSettings.quickHotkey) {
+      try { globalShortcut.unregister(currentSettings.quickHotkey); } catch {}
+    }
+    const success = globalShortcut.register(sanitized, () => {
+      summonQuickAction();
+    });
+    if (success) {
+      currentSettings.quickHotkey = sanitized;
+      if (store) store.set('settings', currentSettings);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error('Failed to update quick hotkey:', err);
+    return false;
+  }
+});
+
+ipcMain.handle('set-login-item', (event, enable) => {
+  try {
+    app.setLoginItemSettings({
+      openAtLogin: Boolean(enable),
+      path: app.getPath('exe')
+    });
+    return true;
+  } catch {
+    return false;
   }
 });
 
