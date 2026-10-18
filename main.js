@@ -1,7 +1,8 @@
-const { app, BrowserWindow, screen, ipcMain, shell, globalShortcut, Tray, Menu, nativeImage, dialog } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, shell, globalShortcut, Tray, Menu, nativeImage, dialog, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { spawn } = require('child_process');
+const https = require('https');
+const { spawn, execSync } = require('child_process');
 
 // Enforce single instance lock
 const gotTheLock = app.requestSingleInstanceLock();
@@ -87,7 +88,6 @@ function createSidebar() {
   screen.on('display-added', () => updateWindowBounds(isExpanded));
   screen.on('display-removed', () => updateWindowBounds(isExpanded));
 
-  // Hide instead of close
   mainWindow.on('close', (event) => {
     if (!app.isQuitting) {
       event.preventDefault();
@@ -96,7 +96,6 @@ function createSidebar() {
     }
   });
 
-  // Auto-hide on blur if configured
   mainWindow.on('blur', () => {
     const currentSettings = getSettings();
     if (currentSettings.autoHide && isVisible && mainWindow) {
@@ -207,7 +206,7 @@ function createTray() {
     tray.setContextMenu(contextMenu);
   }
 
-  tray.setToolTip('EdgeDock - Quick Launcher');
+  tray.setToolTip('EdgeDock - Quick Launcher & Toolbox');
   rebuildContextMenu();
 
   tray.on('click', () => {
@@ -240,12 +239,105 @@ app.on('second-instance', () => {
   }
 });
 
+// -------------------------------------------------------------
+// Power Tool 1: Clipboard History Monitor
+// -------------------------------------------------------------
+let lastClipboardText = '';
+const clipboardHistory = [];
+
+function startClipboardMonitor() {
+  setInterval(() => {
+    try {
+      const text = clipboard.readText();
+      if (text && text.trim() && text !== lastClipboardText) {
+        lastClipboardText = text;
+        const existsIndex = clipboardHistory.findIndex((item) => item.text === text);
+        if (existsIndex !== -1) {
+          clipboardHistory.splice(existsIndex, 1);
+        }
+        clipboardHistory.unshift({
+          id: Date.now().toString(),
+          text,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        });
+        if (clipboardHistory.length > 35) {
+          clipboardHistory.pop();
+        }
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('clipboard-updated', clipboardHistory);
+        }
+      }
+    } catch (e) {}
+  }, 1000);
+}
+
+// -------------------------------------------------------------
+// Power Tool 2: YouTube / Media Engine Helper
+// -------------------------------------------------------------
+function getBundledYtdlPath() {
+  const binDir = path.join(app.getPath('userData'), 'bin');
+  return path.join(binDir, 'yt-dlp.exe');
+}
+
+function resolveYtdlPath() {
+  const localBin = getBundledYtdlPath();
+  if (fs.existsSync(localBin)) {
+    return localBin;
+  }
+  try {
+    const stdout = execSync('where yt-dlp', { stdio: 'pipe' }).toString().split('\r\n')[0].trim();
+    if (stdout && fs.existsSync(stdout)) {
+      return stdout;
+    }
+  } catch (e) {}
+  return null;
+}
+
+function downloadFileWithRedirects(url, destPath, onProgress) {
+  return new Promise((resolve, reject) => {
+    https.get(url, { headers: { 'User-Agent': 'EdgeDock-MediaDownloader' } }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        return downloadFileWithRedirects(res.headers.location, destPath, onProgress).then(resolve).catch(reject);
+      }
+      if (res.statusCode !== 200) {
+        return reject(new Error(`Download failed with status: ${res.statusCode}`));
+      }
+
+      const totalBytes = parseInt(res.headers['content-length'], 10) || 0;
+      let downloadedBytes = 0;
+      const fileStream = fs.createWriteStream(destPath);
+
+      res.on('data', (chunk) => {
+        downloadedBytes += chunk.length;
+        if (totalBytes > 0 && onProgress) {
+          const percent = Math.round((downloadedBytes / totalBytes) * 100);
+          onProgress(percent);
+        }
+      });
+
+      res.pipe(fileStream);
+
+      fileStream.on('finish', () => {
+        fileStream.close();
+        resolve(destPath);
+      });
+
+      fileStream.on('error', (err) => {
+        fs.unlink(destPath, () => {});
+        reject(err);
+      });
+    }).on('error', reject);
+  });
+}
+
+// App Ready
 app.whenReady().then(async () => {
   const Store = (await import('electron-store')).default;
   store = new Store({
     defaults: {
       shortcuts: defaultShortcuts,
-      settings: defaultSettings
+      settings: defaultSettings,
+      scratchpad: ''
     }
   });
 
@@ -260,6 +352,7 @@ app.whenReady().then(async () => {
   createSidebar();
   createTray();
   registerHotkey();
+  startClipboardMonitor();
 });
 
 // IPC: Safe target launch
@@ -277,7 +370,7 @@ ipcMain.handle('launch-target', async (event, targetPath) => {
       return { success: true };
     }
 
-    // 2. File / Directory / Application path (contains slashes or drive colon)
+    // 2. File / Directory / Application path
     if (trimmed.includes('/') || trimmed.includes('\\') || trimmed.includes(':')) {
       const errorMessage = await shell.openPath(trimmed);
       if (errorMessage) {
@@ -286,7 +379,7 @@ ipcMain.handle('launch-target', async (event, targetPath) => {
       return { success: true };
     }
 
-    // 3. Recognized command line tools (e.g., 'code', 'wt', 'cmd')
+    // 3. Recognized command line tools
     const child = spawn(trimmed, [], {
       detached: true,
       stdio: 'ignore',
@@ -304,7 +397,7 @@ ipcMain.handle('launch-target', async (event, targetPath) => {
   }
 });
 
-// IPC: Window Expand / Collapse for flyouts and drawers
+// IPC: Window Expand / Collapse
 ipcMain.on('set-expanded', (event, expanded) => {
   updateWindowBounds(Boolean(expanded));
 });
@@ -346,9 +439,7 @@ ipcMain.handle('get-file-icon', async (event, filePath) => {
     if (icon && !icon.isEmpty()) {
       return icon.toDataURL();
     }
-  } catch (e) {
-    // Fallback
-  }
+  } catch (e) {}
   return null;
 });
 
@@ -391,7 +482,7 @@ ipcMain.handle('show-in-folder', async (event, targetPath) => {
   return false;
 });
 
-// IPC: Shortcut Storage
+// IPC: Shortcuts Storage
 ipcMain.handle('get-shortcuts', () => {
   if (!store) return defaultShortcuts;
   return store.get('shortcuts', defaultShortcuts);
@@ -426,6 +517,147 @@ ipcMain.on('hide-window', () => {
   }
 });
 
+// -------------------------------------------------------------
+// IPC: Power Tool - Clipboard History
+// -------------------------------------------------------------
+ipcMain.handle('get-clipboard-history', () => {
+  return clipboardHistory;
+});
+
+ipcMain.handle('copy-to-clipboard', (event, text) => {
+  if (typeof text === 'string') {
+    clipboard.writeText(text);
+    lastClipboardText = text;
+    return true;
+  }
+  return false;
+});
+
+ipcMain.handle('clear-clipboard-history', () => {
+  clipboardHistory.length = 0;
+  return true;
+});
+
+// -------------------------------------------------------------
+// IPC: Power Tool - Scratchpad
+// -------------------------------------------------------------
+ipcMain.handle('get-scratchpad', () => {
+  if (!store) return '';
+  return store.get('scratchpad', '');
+});
+
+ipcMain.handle('save-scratchpad', (event, text) => {
+  if (store && typeof text === 'string') {
+    store.set('scratchpad', text);
+    return true;
+  }
+  return false;
+});
+
+// -------------------------------------------------------------
+// IPC: Power Tool - YouTube / Media Downloader
+// -------------------------------------------------------------
+ipcMain.handle('check-ytdl-status', () => {
+  const binary = resolveYtdlPath();
+  return { installed: Boolean(binary), path: binary };
+});
+
+ipcMain.handle('install-ytdl', async (event) => {
+  try {
+    const binDir = path.join(app.getPath('userData'), 'bin');
+    if (!fs.existsSync(binDir)) {
+      fs.mkdirSync(binDir, { recursive: true });
+    }
+    const destPath = path.join(binDir, 'yt-dlp.exe');
+    const downloadUrl = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe';
+
+    await downloadFileWithRedirects(downloadUrl, destPath, (percent) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('setup-progress', { percent });
+      }
+    });
+
+    return { success: true, path: destPath };
+  } catch (err) {
+    console.error('Failed to setup yt-dlp:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+let currentDownloadProcess = null;
+
+ipcMain.handle('start-media-download', async (event, { url, format }) => {
+  try {
+    const binary = resolveYtdlPath();
+    if (!binary) {
+      return { success: false, error: 'Media engine not installed. Click "Setup Engine" first.' };
+    }
+
+    if (!url || typeof url !== 'string') {
+      return { success: false, error: 'Please enter a valid YouTube/video URL or title' };
+    }
+
+    const downloadsDir = app.getPath('downloads');
+    const args = ['-P', downloadsDir, '--newline'];
+
+    if (format === 'mp3') {
+      args.push('-x', '--audio-format', 'mp3', '--audio-quality', '0', '-o', '%(title)s.%(ext)s');
+    } else {
+      args.push('-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best', '-o', '%(title)s.%(ext)s');
+    }
+
+    // Support searching by name: if not starting with http, prepend ytsearch1:
+    const target = url.trim().startsWith('http') ? url.trim() : `ytsearch1:${url.trim()}`;
+    args.push(target);
+
+    currentDownloadProcess = spawn(binary, args, { windowsHide: true });
+
+    currentDownloadProcess.stdout.on('data', (data) => {
+      const output = data.toString();
+      // Match [download]  45.2% of 15.00MiB at 4.20MiB/s ETA 00:02
+      const match = output.match(/\[download\]\s+(\d+\.?\d*)%\s+of\s+([^\s]+)\s+at\s+([^\s]+)\s+ETA\s+([^\s\r\n]+)/);
+      if (match && mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('download-progress', {
+          percent: parseFloat(match[1]),
+          size: match[2],
+          speed: match[3],
+          eta: match[4]
+        });
+      }
+    });
+
+    currentDownloadProcess.stderr.on('data', (data) => {
+      console.warn('yt-dlp stderr:', data.toString());
+    });
+
+    currentDownloadProcess.on('close', (code) => {
+      currentDownloadProcess = null;
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        if (code === 0) {
+          mainWindow.webContents.send('download-complete', { success: true });
+        } else {
+          mainWindow.webContents.send('download-complete', { success: false, error: `Process exited with code ${code}` });
+        }
+      }
+    });
+
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('open-downloads-folder', async () => {
+  const dir = app.getPath('downloads');
+  await shell.openPath(dir);
+  return true;
+});
+
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  if (currentDownloadProcess) {
+    try {
+      currentDownloadProcess.kill();
+    } catch (e) {}
+  }
 });
