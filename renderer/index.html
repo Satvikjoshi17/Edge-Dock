@@ -58,6 +58,10 @@
       <button id="tool-scratchpad-btn" class="hud-action-btn tool-btn" title="Tactical Scratchpad">
         <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
       </button>
+
+      <button id="tool-donut-btn" class="hud-action-btn tool-btn" title="J.A.R.V.I.S. Radial Donut Dial (Drag & Drop / Alt+Q)">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3v5M12 16v5M3 12h5M16 12h5" stroke="currentColor" stroke-width="1.5"/></svg>
+      </button>
     </div>
 
     <!-- Footer Controls -->
@@ -244,52 +248,56 @@
     </div>
   </div>
 
-  <!-- J.A.R.V.I.S. Quick-Action Hologram Modal (Triggered by Alt+Q on selected text) -->
-  <div id="quick-hologram-modal" class="quick-hologram-modal">
-    <div class="hologram-modal-header">
-      <div class="modal-arc-tag">// TACTICAL DATA EXTRACTOR</div>
-      <button type="button" id="close-quick-modal-btn" class="hud-mini-btn">✕</button>
+  <!-- J.A.R.V.I.S. Circular Radial Donut Dial (Iron Man Clock Partition HUD) -->
+  <div id="radial-donut-modal" class="radial-donut-modal">
+    <!-- Outer Holographic Frame & Header -->
+    <div class="donut-hud-frame">
+      <div class="donut-header-tag">// RADIAL PROTOCOL DIAL</div>
+      <button type="button" id="close-donut-btn" class="hud-mini-btn" title="Dismiss Radial Dial (Esc)">✕</button>
       <div class="hud-caliper-tl"></div><div class="hud-caliper-br"></div>
     </div>
 
-    <div class="hologram-preview-box">
-      <div class="preview-tag-row">
-        <span class="preview-tag">CAPTURED BUFFER:</span>
-        <span id="quick-preview-stats" class="preview-stats">0 CHARS</span>
+    <!-- Circular SVG Donut Tyre (Annulus with 6 Clock Partitions) -->
+    <div class="donut-wheel-wrapper" id="donut-wheel-wrapper">
+      <svg id="radial-donut-svg" class="radial-donut-svg" viewBox="0 0 340 340">
+        <defs>
+          <filter id="cyan-glow" x="-25%" y="-25%" width="150%" height="150%">
+            <feGaussianBlur stdDeviation="5" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+        </defs>
+
+        <!-- Outer Decorative Gauge Ring -->
+        <circle cx="170" cy="170" r="162" class="gauge-ring-outer" />
+        <circle cx="170" cy="170" r="158" class="gauge-ring-dashed" />
+
+        <!-- 6 Clock Sector Paths (Injected dynamically by app.js) -->
+        <g id="donut-sectors-group" class="donut-sectors-group"></g>
+
+        <!-- Inner Partition Divider Ring -->
+        <circle cx="170" cy="170" r="86" class="gauge-ring-inner" />
+
+        <!-- Center Arc Reactor Core (The Donut Hole) -->
+        <g id="donut-center-core" class="donut-center-core">
+          <circle cx="170" cy="170" r="84" class="core-bg-disc" />
+          <circle cx="170" cy="170" r="76" class="core-ring-dashed spin-slow" />
+          <circle cx="170" cy="170" r="68" class="core-ring-pulse" />
+        </g>
+      </svg>
+
+      <!-- Center Core Dynamic Feedback Display -->
+      <div id="donut-center-info" class="donut-center-info">
+        <div id="donut-center-icon" class="donut-center-icon">🎯</div>
+        <div id="donut-center-title" class="donut-center-title">// ARMED & READY</div>
+        <div id="donut-center-instruction" class="donut-center-instruction">HOVER SECTOR OR DROP</div>
+        <div id="donut-center-preview" class="donut-center-preview">Awaiting payload...</div>
       </div>
-      <div id="quick-text-preview" class="quick-text-preview">No active text in buffer</div>
     </div>
 
-    <div class="quick-actions-grid">
-      <button type="button" id="quick-act-scratchpad" class="quick-action-tile">
-        <span class="action-icon">📝</span>
-        <span class="action-name">TO SCRATCHPAD</span>
-      </button>
-
-      <button type="button" id="quick-act-clipboard" class="quick-action-tile">
-        <span class="action-icon">📋</span>
-        <span class="action-name">TO BUFFER</span>
-      </button>
-
-      <button type="button" id="quick-act-ytdl" class="quick-action-tile">
-        <span class="action-icon">🎬</span>
-        <span class="action-name">SCAN YOUTUBE</span>
-      </button>
-
-      <button type="button" id="quick-act-url" class="quick-action-tile">
-        <span class="action-icon">🌐</span>
-        <span class="action-name">OPEN LINK</span>
-      </button>
-
-      <button type="button" id="quick-act-speak" class="quick-action-tile">
-        <span class="action-icon">🗣️</span>
-        <span class="action-name">JARVIS VOCAL</span>
-      </button>
-
-      <button type="button" id="quick-act-dismiss" class="quick-action-tile danger">
-        <span class="action-icon">✕</span>
-        <span class="action-name">DISMISS</span>
-      </button>
+    <!-- Bottom Tactical Status -->
+    <div class="donut-footer-stats">
+      <span class="donut-foot-tag">HUD STATUS:</span>
+      <span id="donut-foot-text" class="donut-foot-val">READY // RELEASE OVER TARGET SECTOR</span>
     </div>
   </div>
 

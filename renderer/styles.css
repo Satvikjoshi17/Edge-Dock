@@ -1074,143 +1074,283 @@ body.dock-left .toast-msg {
   transform: translateY(0);
 }
 
-/* J.A.R.V.I.S. QUICK-ACTION TACTICAL HOLOGRAM MODAL */
-.quick-hologram-modal {
+/* ============================================================
+   J.A.R.V.I.S. CIRCULAR RADIAL DONUT DIAL (IRON MAN CLOCK HUD)
+   ============================================================ */
+.radial-donut-modal {
   position: fixed;
   top: 50%;
-  right: 86px;
-  transform: translateY(-50%) scale(0.96);
-  width: 284px;
+  right: 84px;
+  transform: translateY(-50%) scale(0.92);
+  width: 292px;
   background: var(--jarvis-drawer-glass);
-  backdrop-filter: blur(26px) saturate(240%);
-  -webkit-backdrop-filter: blur(26px) saturate(240%);
+  backdrop-filter: blur(28px) saturate(240%);
+  -webkit-backdrop-filter: blur(28px) saturate(240%);
   border: 1px solid var(--border-laser-bright);
-  border-radius: 8px;
-  padding: 14px;
-  box-shadow: 0 0 40px rgba(0, 240, 255, 0.35), inset 0 0 20px rgba(0, 240, 255, 0.1), -10px 10px 40px rgba(0, 0, 0, 0.7);
+  border-radius: 14px;
+  padding: 12px 10px 10px 10px;
+  box-shadow: 0 0 50px rgba(0, 240, 255, 0.35), inset 0 0 25px rgba(0, 240, 255, 0.1), -15px 15px 45px rgba(0, 0, 0, 0.85);
   opacity: 0;
   pointer-events: none;
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-  z-index: 2500;
+  transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 2600;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  user-select: none;
 }
 
-body.dock-left .quick-hologram-modal {
+body.dock-left .radial-donut-modal {
   right: auto;
-  left: 86px;
-  box-shadow: 0 0 40px rgba(0, 240, 255, 0.35), inset 0 0 20px rgba(0, 240, 255, 0.1), 10px 10px 40px rgba(0, 0, 0, 0.7);
+  left: 84px;
+  box-shadow: 0 0 50px rgba(0, 240, 255, 0.35), inset 0 0 25px rgba(0, 240, 255, 0.1), 15px 15px 45px rgba(0, 0, 0, 0.85);
 }
 
-.quick-hologram-modal.open {
+.radial-donut-modal.open {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(-50%) scale(1);
 }
 
-.hologram-modal-header {
+/* Header Tag */
+.donut-hud-frame {
   position: relative;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
-  padding-bottom: 6px;
+  margin-bottom: 6px;
+  padding-bottom: 5px;
   border-bottom: 1px solid rgba(0, 240, 255, 0.25);
 }
 
-.modal-arc-tag {
+.donut-header-tag {
   font-family: 'Orbitron', monospace;
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: 800;
   color: var(--jarvis-cyan);
   letter-spacing: 1px;
   text-shadow: 0 0 10px var(--jarvis-glow);
 }
 
-.hologram-preview-box {
-  background: rgba(0, 16, 34, 0.7);
-  border: 1px solid rgba(0, 240, 255, 0.3);
-  border-radius: 6px;
-  padding: 8px;
-  margin-bottom: 12px;
-}
-
-.preview-tag-row {
+/* Donut Wheel Wrapper (Holds SVG & HTML Center Core) */
+.donut-wheel-wrapper {
+  position: relative;
+  width: 270px;
+  height: 270px;
   display: flex;
-  justify-content: space-between;
-  margin-bottom: 4px;
+  align-items: center;
+  justify-content: center;
 }
 
-.preview-tag {
+.radial-donut-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 0 12px rgba(0, 229, 255, 0.2));
+}
+
+/* SVG Sector Groups & Paths */
+.donut-sector-group {
+  cursor: pointer;
+  transition: transform 0.15s ease-out;
+  transform-origin: 170px 170px;
+}
+
+.donut-sector-path {
+  fill: rgba(0, 240, 255, 0.08);
+  stroke: rgba(0, 240, 255, 0.38);
+  stroke-width: 1.2;
+  transition: all 0.16s ease-out;
+}
+
+.donut-sector-group:hover,
+.donut-sector-group.active-sector {
+  transform: scale(1.025);
+}
+
+.donut-sector-group:hover .donut-sector-path,
+.donut-sector-group.active-sector .donut-sector-path {
+  fill: rgba(0, 240, 255, 0.34);
+  stroke: var(--jarvis-cyan);
+  stroke-width: 2.2;
+  filter: url(#cyan-glow);
+}
+
+/* Danger Sector (Cancel / Dismiss) */
+.donut-sector-group.sector-danger .donut-sector-path {
+  fill: rgba(255, 42, 109, 0.1);
+  stroke: rgba(255, 42, 109, 0.45);
+}
+
+.donut-sector-group.sector-danger:hover .donut-sector-path,
+.donut-sector-group.sector-danger.active-sector .donut-sector-path {
+  fill: rgba(255, 42, 109, 0.38);
+  stroke: #ff2a6d;
+  filter: drop-shadow(0 0 12px rgba(255, 42, 109, 0.8));
+}
+
+/* Sector Icon / Text within SVG */
+.sector-glyph-group {
+  pointer-events: none;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.sector-svg-icon {
+  font-size: 13px;
+  user-select: none;
+}
+
+.sector-svg-label {
   font-family: 'Orbitron', monospace;
-  font-size: 7.5px;
+  font-size: 7px;
   font-weight: 800;
-  color: var(--jarvis-cyan);
-  letter-spacing: 0.8px;
+  fill: var(--text-hologram);
+  letter-spacing: 0.5px;
+  user-select: none;
+  transition: fill 0.16s ease;
 }
 
-.preview-stats {
-  font-size: 8px;
-  font-weight: 700;
-  color: var(--stark-gold);
+.donut-sector-group:hover .sector-svg-label,
+.donut-sector-group.active-sector .sector-svg-label {
+  fill: #fff;
+  font-weight: 900;
+  text-shadow: 0 0 8px var(--jarvis-cyan);
 }
 
-.quick-text-preview {
-  font-family: Consolas, monospace;
-  font-size: 10.5px;
-  color: #fff;
-  max-height: 60px;
-  overflow-y: auto;
-  white-space: pre-wrap;
-  word-break: break-all;
-  line-height: 1.35;
-  scrollbar-width: thin;
+.donut-sector-group.sector-danger:hover .sector-svg-label,
+.donut-sector-group.sector-danger.active-sector .sector-svg-label {
+  fill: #fff;
+  text-shadow: 0 0 8px #ff2a6d;
 }
 
-.quick-actions-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 7px;
+/* Gauge Rings */
+.gauge-ring-outer {
+  fill: none;
+  stroke: rgba(0, 240, 255, 0.22);
+  stroke-width: 1;
 }
 
-.quick-action-tile {
-  background: rgba(0, 240, 255, 0.08);
-  border: 1px solid rgba(0, 240, 255, 0.3);
-  border-radius: 6px;
-  padding: 8px 4px;
+.gauge-ring-dashed {
+  fill: none;
+  stroke: rgba(0, 240, 255, 0.35);
+  stroke-width: 1;
+  stroke-dasharray: 4 6;
+}
+
+.gauge-ring-inner {
+  fill: none;
+  stroke: rgba(0, 240, 255, 0.45);
+  stroke-width: 1.5;
+}
+
+/* Center Arc Reactor Core */
+.core-bg-disc {
+  fill: rgba(3, 11, 20, 0.95);
+  stroke: rgba(0, 240, 255, 0.5);
+  stroke-width: 1.5;
+}
+
+.core-ring-dashed {
+  fill: none;
+  stroke: var(--jarvis-cyan);
+  stroke-width: 1;
+  stroke-dasharray: 6 8;
+  transform-origin: 170px 170px;
+}
+
+.core-ring-pulse {
+  fill: none;
+  stroke: rgba(0, 240, 255, 0.45);
+  stroke-width: 1;
+  animation: arc-pulse 2s infinite ease-in-out;
+}
+
+/* Center Core HTML Display (Overlaid for crystal clarity) */
+.donut-center-info {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  cursor: pointer;
-  transition: all 0.18s ease;
-  color: var(--text-hologram);
-}
-
-.quick-action-tile .action-icon {
-  font-size: 14px;
-}
-
-.quick-action-tile .action-name {
-  font-family: 'Orbitron', monospace;
-  font-size: 8px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
   text-align: center;
+  pointer-events: none;
+  padding: 6px;
+  z-index: 10;
 }
 
-.quick-action-tile:hover {
-  background: var(--jarvis-cyan);
-  color: #010a14;
-  border-color: var(--jarvis-cyan);
-  box-shadow: 0 0 16px var(--jarvis-glow);
-  transform: translateY(-2px);
+.donut-center-icon {
+  font-size: 19px;
+  line-height: 1;
+  margin-bottom: 2px;
+  filter: drop-shadow(0 0 6px var(--jarvis-cyan));
+  transition: transform 0.15s ease;
 }
 
-.quick-action-tile.danger:hover {
-  background: var(--danger);
-  border-color: var(--danger);
+.donut-center-title {
+  font-family: 'Orbitron', monospace;
+  font-size: 7.5px;
+  font-weight: 800;
   color: #fff;
-  box-shadow: 0 0 16px rgba(255, 42, 109, 0.6);
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+  text-shadow: 0 0 8px var(--jarvis-cyan);
+  margin-bottom: 2px;
+}
+
+.donut-center-instruction {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 7.5px;
+  font-weight: 700;
+  color: var(--jarvis-cyan);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.donut-center-preview {
+  font-family: Consolas, monospace;
+  font-size: 7px;
+  color: rgba(255, 255, 255, 0.65);
+  max-width: 104px;
+  max-height: 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Footer Stats */
+.donut-footer-stats {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding: 5px 8px;
+  background: rgba(0, 16, 32, 0.6);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  border-radius: 6px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.donut-foot-tag {
+  color: var(--jarvis-cyan);
+  letter-spacing: 0.8px;
+}
+
+.donut-foot-val {
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 190px;
 }

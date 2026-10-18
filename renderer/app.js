@@ -48,6 +48,27 @@ function playJarvisSound(type = 'blip') {
   } catch {}
 }
 
+function playJarvisTone(freq = 1400, duration = 0.04) {
+  try {
+    const ctx = getAudioContext();
+    if (ctx.state === 'suspended') ctx.resume();
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    const now = ctx.currentTime;
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, now);
+    osc.frequency.exponentialRampToValueAtTime(freq + 70, now + duration);
+    gain.gain.setValueAtTime(0.04, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    osc.start(now);
+    osc.stop(now + duration);
+  } catch {}
+}
+
 let shortcuts = [];
 let currentSettings = {
   dockPosition: 'right',
@@ -80,6 +101,7 @@ const closeBtn = document.getElementById('close-btn');
 const toolYtdlBtn = document.getElementById('tool-ytdl-btn');
 const toolClipboardBtn = document.getElementById('tool-clipboard-btn');
 const toolScratchpadBtn = document.getElementById('tool-scratchpad-btn');
+const toolDonutBtn = document.getElementById('tool-donut-btn');
 
 // Add/Edit Drawer
 const drawer = document.getElementById('drawer');
@@ -135,17 +157,16 @@ const launchBootSwitch = document.getElementById('launch-boot-switch');
 const autohideSwitch = document.getElementById('autohide-switch');
 const closeSettingsBtn = document.getElementById('close-settings-btn');
 
-// Quick-Action Hologram Modal
-const quickHologramModal = document.getElementById('quick-hologram-modal');
-const closeQuickModalBtn = document.getElementById('close-quick-modal-btn');
-const quickTextPreview = document.getElementById('quick-text-preview');
-const quickPreviewStats = document.getElementById('quick-preview-stats');
-const quickActScratchpad = document.getElementById('quick-act-scratchpad');
-const quickActClipboard = document.getElementById('quick-act-clipboard');
-const quickActYtdl = document.getElementById('quick-act-ytdl');
-const quickActUrl = document.getElementById('quick-act-url');
-const quickActSpeak = document.getElementById('quick-act-speak');
-const quickActDismiss = document.getElementById('quick-act-dismiss');
+// J.A.R.V.I.S. Circular Radial Donut Dial
+const radialDonutModal = document.getElementById('radial-donut-modal');
+const closeDonutBtn = document.getElementById('close-donut-btn');
+const donutWheelWrapper = document.getElementById('donut-wheel-wrapper');
+const donutSectorsGroup = document.getElementById('donut-sectors-group');
+const donutCenterIcon = document.getElementById('donut-center-icon');
+const donutCenterTitle = document.getElementById('donut-center-title');
+const donutCenterInstruction = document.getElementById('donut-center-instruction');
+const donutCenterPreview = document.getElementById('donut-center-preview');
+const donutFootText = document.getElementById('donut-foot-text');
 
 // Context Menu & Toast
 const contextMenu = document.getElementById('context-menu');
@@ -155,7 +176,7 @@ const ctxEdit = document.getElementById('ctx-edit');
 const ctxDelete = document.getElementById('ctx-delete');
 const toastEl = document.getElementById('toast');
 
-const allDrawers = [drawer, settingsDrawer, ytdlDrawer, clipboardDrawer, scratchpadDrawer, quickHologramModal];
+const allDrawers = [drawer, settingsDrawer, ytdlDrawer, clipboardDrawer, scratchpadDrawer, radialDonutModal];
 
 // -------------------------------------------------------------
 // Mouse Event Forwarding (Permanent fix for hover glitch)
@@ -212,11 +233,12 @@ async function init() {
     });
 
     window.dockAPI.onSummonQuickAction((text) => {
-      handleSummonQuickAction(text);
+      openRadialDonutModal(text);
     });
   }
 
   applySettings(currentSettings);
+  buildRadialDonutSvg();
   await loadMissingIcons();
   renderShortcuts();
 }
@@ -1042,128 +1064,395 @@ closeBtn.addEventListener('click', () => {
 });
 
 // -------------------------------------------------------------
-// J.A.R.V.I.S. Quick-Action Hologram Modal Handlers
+// J.A.R.V.I.S. Circular Radial Donut Dial (Iron Man Clock HUD)
 // -------------------------------------------------------------
-function handleSummonQuickAction(text) {
+const RADIAL_SECTORS = [
+  {
+    id: 'scratchpad',
+    name: 'SCRATCHPAD',
+    subtitle: 'ADD TO TACTICAL NOTES',
+    icon: '📝',
+    midAngle: -90, // 12 o'clock
+    freq: 1400
+  },
+  {
+    id: 'clipboard',
+    name: 'CLIPBOARD',
+    subtitle: 'BUFFER TO MEMORY',
+    icon: '📋',
+    midAngle: -30, // 2 o'clock
+    freq: 1550
+  },
+  {
+    id: 'youtube',
+    name: 'YOUTUBE',
+    subtitle: 'ACQUIRE VIDEO STREAM',
+    icon: '🎬',
+    midAngle: 30, // 4 o'clock
+    freq: 1700
+  },
+  {
+    id: 'weblink',
+    name: 'OPEN URL',
+    subtitle: 'BROWSE OR NAVIGATE',
+    icon: '🌐',
+    midAngle: 90, // 6 o'clock
+    freq: 1850
+  },
+  {
+    id: 'voice',
+    name: 'JARVIS VOICE',
+    subtitle: 'VOCAL SYNTHESIS',
+    icon: '🗣️',
+    midAngle: 150, // 8 o'clock
+    freq: 2000
+  },
+  {
+    id: 'dismiss',
+    name: 'DISMISS',
+    subtitle: 'ABORT PROTOCOL',
+    icon: '✕',
+    midAngle: 210, // 10 o'clock
+    isDanger: true,
+    freq: 900
+  }
+];
+
+let activeHoveredSectorId = null;
+
+function polarToCartesian(cx, cy, r, angleDeg) {
+  const rad = (angleDeg * Math.PI) / 180.0;
+  return {
+    x: cx + r * Math.cos(rad),
+    y: cy + r * Math.sin(rad)
+  };
+}
+
+function describeDonutSector(cx, cy, rIn, rOut, startAngle, endAngle) {
+  const startOut = polarToCartesian(cx, cy, rOut, startAngle);
+  const endOut = polarToCartesian(cx, cy, rOut, endAngle);
+  const endIn = polarToCartesian(cx, cy, rIn, endAngle);
+  const startIn = polarToCartesian(cx, cy, rIn, startAngle);
+
+  const largeArcFlag = endAngle - startAngle <= 180 ? 0 : 1;
+
+  return [
+    'M', startOut.x.toFixed(2), startOut.y.toFixed(2),
+    'A', rOut, rOut, 0, largeArcFlag, 1, endOut.x.toFixed(2), endOut.y.toFixed(2),
+    'L', endIn.x.toFixed(2), endIn.y.toFixed(2),
+    'A', rIn, rIn, 0, largeArcFlag, 0, startIn.x.toFixed(2), startIn.y.toFixed(2),
+    'Z'
+  ].join(' ');
+}
+
+function buildRadialDonutSvg() {
+  if (!donutSectorsGroup) return;
+  donutSectorsGroup.innerHTML = '';
+
+  const cx = 170;
+  const cy = 170;
+  const rIn = 88;
+  const rOut = 154;
+
+  RADIAL_SECTORS.forEach((sector) => {
+    // 60-degree sector with a 3-degree laser gap
+    const startAngle = sector.midAngle - 28.5;
+    const endAngle = sector.midAngle + 28.5;
+
+    const pathData = describeDonutSector(cx, cy, rIn, rOut, startAngle, endAngle);
+
+    // Positions for glyphs in sector
+    const iconPos = polarToCartesian(cx, cy, 126, sector.midAngle);
+    const labelPos = polarToCartesian(cx, cy, 104, sector.midAngle);
+
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('class', `donut-sector-group ${sector.isDanger ? 'sector-danger' : ''}`);
+    group.setAttribute('data-id', sector.id);
+
+    group.innerHTML = `
+      <path class="donut-sector-path" d="${pathData}" />
+      <g class="sector-glyph-group">
+        <text class="sector-svg-icon" x="${iconPos.x.toFixed(2)}" y="${iconPos.y.toFixed(2)}">${sector.icon}</text>
+        <text class="sector-svg-label" x="${labelPos.x.toFixed(2)}" y="${labelPos.y.toFixed(2)}">${sector.name}</text>
+      </g>
+    `;
+
+    donutSectorsGroup.appendChild(group);
+  });
+}
+
+function getSectorFromCoordinates(clientX, clientY) {
+  if (!donutWheelWrapper) return { zone: 'outside', sector: null };
+  const rect = donutWheelWrapper.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const dx = clientX - cx;
+  const dy = clientY - cy;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+
+  // Scaled radii inside the DOM element
+  const scale = rect.width / 340;
+  const rInScaled = 86 * scale;
+  const rOutScaled = 160 * scale;
+
+  if (dist < rInScaled) {
+    return { zone: 'center', sector: null };
+  }
+  if (dist > rOutScaled + 24) {
+    return { zone: 'outside', sector: null };
+  }
+
+  // Calculate angle in degrees [-180, 180]
+  const deg = (Math.atan2(dy, dx) * 180) / Math.PI;
+
+  for (const s of RADIAL_SECTORS) {
+    let diff = deg - s.midAngle;
+    while (diff > 180) diff -= 360;
+    while (diff < -180) diff += 360;
+    if (Math.abs(diff) <= 30) {
+      return { zone: 'sector', sector: s };
+    }
+  }
+
+  return { zone: 'outside', sector: null };
+}
+
+function setActiveSector(sector) {
+  const newId = sector ? sector.id : null;
+  if (newId === activeHoveredSectorId) return;
+  activeHoveredSectorId = newId;
+
+  const groups = donutSectorsGroup.querySelectorAll('.donut-sector-group');
+  groups.forEach((g) => {
+    if (sector && g.dataset.id === sector.id) {
+      g.classList.add('active-sector');
+    } else {
+      g.classList.remove('active-sector');
+    }
+  });
+
+  if (sector) {
+    playJarvisTone(sector.freq);
+    donutCenterIcon.textContent = sector.icon;
+    donutCenterTitle.textContent = `// ${sector.name}`;
+    donutCenterInstruction.textContent = sector.subtitle;
+    donutFootText.textContent = `PROTOCOL: ${sector.name} [RELEASE OR CLICK TO ENGAGE]`;
+  } else {
+    donutCenterIcon.textContent = '🎯';
+    donutCenterTitle.textContent = '// ARMED & READY';
+    donutCenterInstruction.textContent = 'HOVER SECTOR OR DROP';
+    donutFootText.textContent = 'READY // HOVER OVER DESIRED CLOCK SECTOR';
+  }
+}
+
+function openRadialDonutModal(text = '') {
   currentQuickText = (text || '').trim();
   closeAllDrawers();
 
   if (currentQuickText) {
-    quickTextPreview.textContent = currentQuickText;
-    const charCount = currentQuickText.length;
-    const wordCount = currentQuickText.split(/\s+/).filter(Boolean).length;
-    quickPreviewStats.textContent = `${charCount} CHARS // ${wordCount} TOKENS`;
+    const previewSnip = currentQuickText.length > 36 ? currentQuickText.slice(0, 36) + '...' : currentQuickText;
+    donutCenterPreview.textContent = previewSnip;
+    donutCenterPreview.title = currentQuickText;
   } else {
-    quickTextPreview.textContent = '// BUFFER EMPTY: Select text in any window and press Alt+Q (or copy text).';
-    quickPreviewStats.textContent = '0 CHARS // 0 TOKENS';
+    donutCenterPreview.textContent = 'Awaiting payload...';
   }
 
+  // Adjust URL sector label if payload is URL
   const isUrl = /^https?:\/\//i.test(currentQuickText);
-  const urlLabel = quickActUrl.querySelector('.action-name');
-  if (urlLabel) {
-    urlLabel.textContent = isUrl ? 'OPEN LINK' : 'SEARCH WEB';
+  const webSector = RADIAL_SECTORS.find((s) => s.id === 'weblink');
+  if (webSector) {
+    webSector.name = isUrl ? 'OPEN LINK' : 'SEARCH WEB';
+    webSector.subtitle = isUrl ? 'BROWSE TO URL' : 'QUERY GOOGLE';
+    const labelEl = donutSectorsGroup.querySelector(`.donut-sector-group[data-id="weblink"] .sector-svg-label`);
+    if (labelEl) labelEl.textContent = webSector.name;
   }
 
-  quickHologramModal.classList.add('open');
+  setActiveSector(null);
+  radialDonutModal.classList.add('open');
   playJarvisSound('engage');
-  showToast('J.A.R.V.I.S. Tactical Extractor Engaged');
+  showToast('J.A.R.V.I.S. Radial Donut Dial Active');
+
+  if (window.dockAPI) {
+    window.dockAPI.setIgnoreMouse(false);
+  }
 }
 
-closeQuickModalBtn.addEventListener('click', () => {
-  quickHologramModal.classList.remove('open');
-});
+function closeRadialDonutModal() {
+  radialDonutModal.classList.remove('open');
+  setActiveSector(null);
+}
 
-quickActDismiss.addEventListener('click', () => {
-  quickHologramModal.classList.remove('open');
-});
+async function executeSectorAction(sectorId, payloadText = currentQuickText) {
+  const text = (payloadText || currentQuickText || '').trim();
 
-quickActScratchpad.addEventListener('click', async () => {
-  if (!currentQuickText) {
-    showToast('Buffer is empty');
+  if (sectorId === 'dismiss') {
+    closeRadialDonutModal();
+    playJarvisSound('blip');
+    showToast('Protocol Cancelled');
     return;
   }
+
+  if (!text && sectorId !== 'dismiss') {
+    showToast('Buffer empty - Copy or drag text to engage');
+    closeRadialDonutModal();
+    return;
+  }
+
   playJarvisSound('engage');
-  const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const entry = `\n// [J.A.R.V.I.S. Extracted @ ${timeStr}]\n${currentQuickText}\n`;
-  scratchpadText.value = (scratchpadText.value ? scratchpadText.value + '\n' : '') + entry;
-  updateScratchpadCounter(scratchpadText.value);
-  if (window.dockAPI) {
-    await window.dockAPI.saveScratchpad(scratchpadText.value);
+
+  switch (sectorId) {
+    case 'scratchpad': {
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const entry = `\n// [J.A.R.V.I.S. Radial Drop @ ${timeStr}]\n${text}\n`;
+      scratchpadText.value = (scratchpadText.value ? scratchpadText.value + '\n' : '') + entry;
+      updateScratchpadCounter(scratchpadText.value);
+      if (window.dockAPI) {
+        await window.dockAPI.saveScratchpad(scratchpadText.value);
+      }
+      showToast('Transferred to Tactical Scratchpad');
+      break;
+    }
+
+    case 'clipboard': {
+      if (window.dockAPI) {
+        await window.dockAPI.copyToClipboard(text);
+      } else {
+        await navigator.clipboard.writeText(text);
+      }
+      showToast('Buffered to Memory & Clipboard');
+      break;
+    }
+
+    case 'youtube': {
+      closeRadialDonutModal();
+      await openYtdlDrawer();
+      ytdlQueryInput.value = text;
+      ytdlSearchForm.dispatchEvent(new Event('submit'));
+      return;
+    }
+
+    case 'weblink': {
+      let target = text;
+      if (!/^https?:\/\//i.test(target)) {
+        target = `https://www.google.com/search?q=${encodeURIComponent(target)}`;
+      }
+      if (window.dockAPI) {
+        window.dockAPI.launchTarget(target);
+      } else {
+        window.open(target, '_blank');
+      }
+      showToast('Deploying Link Protocol...');
+      break;
+    }
+
+    case 'voice': {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const snippet = text.slice(0, 320);
+        const utter = new SpeechSynthesisUtterance(snippet);
+        const voices = window.speechSynthesis.getVoices();
+        const jarvisVoice = voices.find((v) =>
+          v.lang.includes('en-GB') ||
+          v.name.toLowerCase().includes('george') ||
+          v.name.toLowerCase().includes('hazel') ||
+          v.name.toLowerCase().includes('david') ||
+          v.lang.includes('en-US')
+        );
+        if (jarvisVoice) utter.voice = jarvisVoice;
+        utter.rate = 1.05;
+        utter.pitch = 0.95;
+        window.speechSynthesis.speak(utter);
+        showToast('J.A.R.V.I.S. Vocal Readout Engaged');
+      }
+      break;
+    }
   }
-  showToast('Dispatched to Tactical Scratchpad');
-  quickHologramModal.classList.remove('open');
+
+  closeRadialDonutModal();
+}
+
+// Global Drag & Drop Listeners
+window.addEventListener('dragenter', (e) => {
+  e.preventDefault();
+  if (!radialDonutModal.classList.contains('open')) {
+    openRadialDonutModal(window.getSelection().toString() || '');
+  }
 });
 
-quickActClipboard.addEventListener('click', async () => {
-  if (!currentQuickText) {
-    showToast('Buffer is empty');
-    return;
+window.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  if (e.dataTransfer) {
+    e.dataTransfer.dropEffect = 'copy';
   }
-  playJarvisSound('blip');
-  if (window.dockAPI) {
-    await window.dockAPI.copyToClipboard(currentQuickText);
+  if (radialDonutModal.classList.contains('open')) {
+    const result = getSectorFromCoordinates(e.clientX, e.clientY);
+    if (result.zone === 'sector') {
+      setActiveSector(result.sector);
+    } else {
+      setActiveSector(null);
+    }
+  }
+});
+
+window.addEventListener('dragleave', (e) => {
+  if (!e.relatedTarget && (e.clientX <= 0 || e.clientY <= 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight)) {
+    closeRadialDonutModal();
+  }
+});
+
+window.addEventListener('drop', (e) => {
+  e.preventDefault();
+  if (radialDonutModal.classList.contains('open')) {
+    let droppedText = '';
+    if (e.dataTransfer) {
+      droppedText = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text') || '';
+    }
+    if (!droppedText) {
+      droppedText = currentQuickText;
+    }
+
+    const result = getSectorFromCoordinates(e.clientX, e.clientY);
+    if (result.zone === 'sector' && result.sector) {
+      executeSectorAction(result.sector.id, droppedText);
+    } else {
+      closeRadialDonutModal();
+    }
+  }
+});
+
+// Pointer & Click events on Donut Wheel
+donutWheelWrapper.addEventListener('mousemove', (e) => {
+  const result = getSectorFromCoordinates(e.clientX, e.clientY);
+  if (result.zone === 'sector') {
+    setActiveSector(result.sector);
   } else {
-    await navigator.clipboard.writeText(currentQuickText);
+    setActiveSector(null);
   }
-  showToast('Buffered to Memory & Clipboard');
-  quickHologramModal.classList.remove('open');
 });
 
-quickActYtdl.addEventListener('click', async () => {
-  if (!currentQuickText) {
-    showToast('Buffer is empty');
-    return;
+donutWheelWrapper.addEventListener('click', (e) => {
+  const result = getSectorFromCoordinates(e.clientX, e.clientY);
+  if (result.zone === 'sector' && result.sector) {
+    executeSectorAction(result.sector.id, currentQuickText);
+  } else if (result.zone === 'center') {
+    closeRadialDonutModal();
   }
-  quickHologramModal.classList.remove('open');
-  await openYtdlDrawer();
-  ytdlQueryInput.value = currentQuickText;
-  ytdlSearchForm.dispatchEvent(new Event('submit'));
 });
 
-quickActUrl.addEventListener('click', () => {
-  if (!currentQuickText) {
-    showToast('Buffer is empty');
-    return;
-  }
-  playJarvisSound('engage');
-  let target = currentQuickText;
-  if (!/^https?:\/\//i.test(target)) {
-    target = `https://www.google.com/search?q=${encodeURIComponent(target)}`;
-  }
-  if (window.dockAPI) {
-    window.dockAPI.launchTarget(target);
+closeDonutBtn.addEventListener('click', closeRadialDonutModal);
+
+toolDonutBtn.addEventListener('click', async () => {
+  if (radialDonutModal.classList.contains('open')) {
+    closeRadialDonutModal();
   } else {
-    window.open(target, '_blank');
-  }
-  showToast('Deploying Link Protocol...');
-  quickHologramModal.classList.remove('open');
-});
-
-quickActSpeak.addEventListener('click', () => {
-  if (!currentQuickText) {
-    showToast('Buffer is empty');
-    return;
-  }
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
-    const snippet = currentQuickText.slice(0, 320);
-    const utter = new SpeechSynthesisUtterance(snippet);
-    const voices = window.speechSynthesis.getVoices();
-    const jarvisVoice = voices.find((v) =>
-      v.lang.includes('en-GB') ||
-      v.name.toLowerCase().includes('george') ||
-      v.name.toLowerCase().includes('hazel') ||
-      v.name.toLowerCase().includes('david') ||
-      v.lang.includes('en-US')
-    );
-    if (jarvisVoice) utter.voice = jarvisVoice;
-    utter.rate = 1.05;
-    utter.pitch = 0.95;
-    window.speechSynthesis.speak(utter);
-    playJarvisSound('engage');
-    showToast('J.A.R.V.I.S. Vocal Readout Engaged');
-  } else {
-    showToast('Speech Synthesizer Unavailable');
+    let text = '';
+    if (window.dockAPI) {
+      const history = await window.dockAPI.getClipboardHistory();
+      if (history && history.length > 0) {
+        text = history[0];
+      }
+    }
+    openRadialDonutModal(text);
   }
 });
 
