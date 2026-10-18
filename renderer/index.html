@@ -59,8 +59,8 @@
         <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
       </button>
 
-      <button id="tool-donut-btn" class="hud-action-btn tool-btn" title="J.A.R.V.I.S. Radial Donut Dial (Drag & Drop / Alt+Q)">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3v5M12 16v5M3 12h5M16 12h5" stroke="currentColor" stroke-width="1.5"/></svg>
+      <button id="tool-pods-btn" class="hud-action-btn tool-btn" title="J.A.R.V.I.S. Drop Pods (Drag Text or Alt+Q)">
+        <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
       </button>
     </div>
 
@@ -248,56 +248,71 @@
     </div>
   </div>
 
-  <!-- J.A.R.V.I.S. Circular Radial Donut Dial (Iron Man Clock Partition HUD) -->
-  <div id="radial-donut-modal" class="radial-donut-modal">
-    <!-- Outer Holographic Frame & Header -->
-    <div class="donut-hud-frame">
-      <div class="donut-header-tag">// RADIAL PROTOCOL DIAL</div>
-      <button type="button" id="close-donut-btn" class="hud-mini-btn" title="Dismiss Radial Dial (Esc)">✕</button>
+  <!-- J.A.R.V.I.S. Holographic Drop Pods (Zero-Friction Ingestion Conduit) -->
+  <div id="hologram-pods-drawer" class="hologram-pods-drawer">
+    <div class="pods-header">
+      <div class="pods-title-tag">// J.A.R.V.I.S. INGESTION CONDUIT</div>
+      <button type="button" id="close-pods-btn" class="hud-mini-btn" title="Dismiss Pods (Esc)">✕</button>
       <div class="hud-caliper-tl"></div><div class="hud-caliper-br"></div>
     </div>
 
-    <!-- Circular SVG Donut Tyre (Annulus with 6 Clock Partitions) -->
-    <div class="donut-wheel-wrapper" id="donut-wheel-wrapper">
-      <svg id="radial-donut-svg" class="radial-donut-svg" viewBox="0 0 340 340">
-        <defs>
-          <filter id="cyan-glow" x="-25%" y="-25%" width="150%" height="150%">
-            <feGaussianBlur stdDeviation="5" result="blur" />
-            <feComposite in="SourceGraphic" in2="blur" operator="over" />
-          </filter>
-        </defs>
+    <!-- Active Payload Info Bar -->
+    <div class="pods-payload-preview">
+      <span class="payload-tag">TARGET BUFFER:</span>
+      <span id="pods-preview-text" class="payload-text">DRAG TEXT HERE OR DROP INTO A POD</span>
+    </div>
 
-        <!-- Outer Decorative Gauge Ring -->
-        <circle cx="170" cy="170" r="162" class="gauge-ring-outer" />
-        <circle cx="170" cy="170" r="158" class="gauge-ring-dashed" />
+    <!-- 5 Generous Holographic Landing Pods -->
+    <div class="pods-container" id="pods-container">
+      <div class="drop-pod" data-action="scratchpad">
+        <div class="pod-icon-box">📝</div>
+        <div class="pod-info">
+          <div class="pod-title">TACTICAL SCRATCHPAD</div>
+          <div class="pod-sub">DROP TO APPEND TO PERSISTENT NOTES</div>
+        </div>
+        <div class="pod-cue">DROP</div>
+      </div>
 
-        <!-- 6 Clock Sector Paths (Injected dynamically by app.js) -->
-        <g id="donut-sectors-group" class="donut-sectors-group"></g>
+      <div class="drop-pod" data-action="clipboard">
+        <div class="pod-icon-box">📋</div>
+        <div class="pod-info">
+          <div class="pod-title">MEMORY BUFFER</div>
+          <div class="pod-sub">DROP TO WRITE TO SYSTEM CLIPBOARD</div>
+        </div>
+        <div class="pod-cue">DROP</div>
+      </div>
 
-        <!-- Inner Partition Divider Ring -->
-        <circle cx="170" cy="170" r="86" class="gauge-ring-inner" />
+      <div class="drop-pod" data-action="youtube">
+        <div class="pod-icon-box">🎬</div>
+        <div class="pod-info">
+          <div class="pod-title">YOUTUBE MEDIA CORE</div>
+          <div class="pod-sub">DROP TO SCAN & DOWNLOAD VIDEO/AUDIO</div>
+        </div>
+        <div class="pod-cue">DROP</div>
+      </div>
 
-        <!-- Center Arc Reactor Core (The Donut Hole) -->
-        <g id="donut-center-core" class="donut-center-core">
-          <circle cx="170" cy="170" r="84" class="core-bg-disc" />
-          <circle cx="170" cy="170" r="76" class="core-ring-dashed spin-slow" />
-          <circle cx="170" cy="170" r="68" class="core-ring-pulse" />
-        </g>
-      </svg>
+      <div class="drop-pod" data-action="weblink">
+        <div class="pod-icon-box">🌐</div>
+        <div class="pod-info">
+          <div class="pod-title">WEB / LINK SEARCH</div>
+          <div class="pod-sub">DROP TO OPEN URL OR QUERY GOOGLE</div>
+        </div>
+        <div class="pod-cue">DROP</div>
+      </div>
 
-      <!-- Center Core Dynamic Feedback Display -->
-      <div id="donut-center-info" class="donut-center-info">
-        <div id="donut-center-icon" class="donut-center-icon">🎯</div>
-        <div id="donut-center-title" class="donut-center-title">// ARMED & READY</div>
-        <div id="donut-center-instruction" class="donut-center-instruction">HOVER SECTOR OR DROP</div>
-        <div id="donut-center-preview" class="donut-center-preview">Awaiting payload...</div>
+      <div class="drop-pod" data-action="voice">
+        <div class="pod-icon-box">🗣️</div>
+        <div class="pod-info">
+          <div class="pod-title">JARVIS VOCAL READOUT</div>
+          <div class="pod-sub">DROP FOR SYNTHESIZED SPEECH</div>
+        </div>
+        <div class="pod-cue">DROP</div>
       </div>
     </div>
 
-    <!-- Bottom Tactical Status -->
-    <div class="donut-footer-stats">
-      <span class="donut-foot-tag">HUD STATUS:</span>
-      <span id="donut-foot-text" class="donut-foot-val">READY // RELEASE OVER TARGET SECTOR</span>
+    <div class="pods-footer">
+      <span class="pods-hint-tag">STATUS:</span>
+      <span id="pods-foot-status" class="pods-hint-val">READY // RELEASE ANY TEXT DIRECTLY INTO A POD</span>
     </div>
   </div>
 

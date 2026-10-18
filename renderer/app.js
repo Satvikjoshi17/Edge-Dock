@@ -101,7 +101,7 @@ const closeBtn = document.getElementById('close-btn');
 const toolYtdlBtn = document.getElementById('tool-ytdl-btn');
 const toolClipboardBtn = document.getElementById('tool-clipboard-btn');
 const toolScratchpadBtn = document.getElementById('tool-scratchpad-btn');
-const toolDonutBtn = document.getElementById('tool-donut-btn');
+const toolPodsBtn = document.getElementById('tool-pods-btn');
 
 // Add/Edit Drawer
 const drawer = document.getElementById('drawer');
@@ -157,16 +157,12 @@ const launchBootSwitch = document.getElementById('launch-boot-switch');
 const autohideSwitch = document.getElementById('autohide-switch');
 const closeSettingsBtn = document.getElementById('close-settings-btn');
 
-// J.A.R.V.I.S. Circular Radial Donut Dial
-const radialDonutModal = document.getElementById('radial-donut-modal');
-const closeDonutBtn = document.getElementById('close-donut-btn');
-const donutWheelWrapper = document.getElementById('donut-wheel-wrapper');
-const donutSectorsGroup = document.getElementById('donut-sectors-group');
-const donutCenterIcon = document.getElementById('donut-center-icon');
-const donutCenterTitle = document.getElementById('donut-center-title');
-const donutCenterInstruction = document.getElementById('donut-center-instruction');
-const donutCenterPreview = document.getElementById('donut-center-preview');
-const donutFootText = document.getElementById('donut-foot-text');
+// J.A.R.V.I.S. Holographic Drop Pods
+const hologramPodsDrawer = document.getElementById('hologram-pods-drawer');
+const closePodsBtn = document.getElementById('close-pods-btn');
+const podsPreviewText = document.getElementById('pods-preview-text');
+const podsFootStatus = document.getElementById('pods-foot-status');
+const dropPods = document.querySelectorAll('.drop-pod');
 
 // Context Menu & Toast
 const contextMenu = document.getElementById('context-menu');
@@ -176,7 +172,7 @@ const ctxEdit = document.getElementById('ctx-edit');
 const ctxDelete = document.getElementById('ctx-delete');
 const toastEl = document.getElementById('toast');
 
-const allDrawers = [drawer, settingsDrawer, ytdlDrawer, clipboardDrawer, scratchpadDrawer, radialDonutModal];
+const allDrawers = [drawer, settingsDrawer, ytdlDrawer, clipboardDrawer, scratchpadDrawer, hologramPodsDrawer];
 
 // -------------------------------------------------------------
 // Mouse Event Forwarding (Permanent fix for hover glitch)
@@ -233,12 +229,11 @@ async function init() {
     });
 
     window.dockAPI.onSummonQuickAction((text) => {
-      openRadialDonutModal(text);
+      openHologramPods(text);
     });
   }
 
   applySettings(currentSettings);
-  buildRadialDonutSvg();
   await loadMissingIcons();
   renderShortcuts();
 }
@@ -1064,276 +1059,77 @@ closeBtn.addEventListener('click', () => {
 });
 
 // -------------------------------------------------------------
-// J.A.R.V.I.S. Circular Radial Donut Dial (Iron Man Clock HUD)
+// J.A.R.V.I.S. Holographic Drop Pods (Zero-Friction Ingestion)
 // -------------------------------------------------------------
-const RADIAL_SECTORS = [
-  {
-    id: 'scratchpad',
-    name: 'SCRATCHPAD',
-    subtitle: 'ADD TO TACTICAL NOTES',
-    tag: 'SEC-01',
-    icon: '📝',
-    midAngle: -90, // 12 o'clock
-    freq: 1400
-  },
-  {
-    id: 'clipboard',
-    name: 'CLIPBOARD',
-    subtitle: 'BUFFER TO MEMORY',
-    tag: 'SEC-02',
-    icon: '📋',
-    midAngle: -30, // 2 o'clock
-    freq: 1550
-  },
-  {
-    id: 'youtube',
-    name: 'YOUTUBE',
-    subtitle: 'ACQUIRE VIDEO STREAM',
-    tag: 'SEC-03',
-    icon: '🎬',
-    midAngle: 30, // 4 o'clock
-    freq: 1700
-  },
-  {
-    id: 'weblink',
-    name: 'OPEN URL',
-    subtitle: 'BROWSE OR NAVIGATE',
-    tag: 'SEC-04',
-    icon: '🌐',
-    midAngle: 90, // 6 o'clock
-    freq: 1850
-  },
-  {
-    id: 'voice',
-    name: 'JARVIS VOICE',
-    subtitle: 'VOCAL SYNTHESIS',
-    tag: 'SEC-05',
-    icon: '🗣️',
-    midAngle: 150, // 8 o'clock
-    freq: 2000
-  },
-  {
-    id: 'dismiss',
-    name: 'DISMISS',
-    subtitle: 'ABORT PROTOCOL',
-    tag: 'SEC-06',
-    icon: '✕',
-    midAngle: 210, // 10 o'clock
-    isDanger: true,
-    freq: 900
-  }
-];
+const POD_FREQUENCIES = {
+  scratchpad: 1400,
+  clipboard: 1550,
+  youtube: 1700,
+  weblink: 1850,
+  voice: 2000
+};
 
-let activeHoveredSectorId = null;
-
-function polarToCartesian(cx, cy, r, angleDeg) {
-  const rad = (angleDeg * Math.PI) / 180.0;
-  return {
-    x: cx + r * Math.cos(rad),
-    y: cy + r * Math.sin(rad)
-  };
-}
-
-function describeDonutSector(cx, cy, rIn, rOut, startAngle, endAngle) {
-  const startOut = polarToCartesian(cx, cy, rOut, startAngle);
-  const endOut = polarToCartesian(cx, cy, rOut, endAngle);
-  const endIn = polarToCartesian(cx, cy, rIn, endAngle);
-  const startIn = polarToCartesian(cx, cy, rIn, startAngle);
-
-  const largeArcFlag = endAngle - startAngle <= 180 ? 0 : 1;
-
-  return [
-    'M', startOut.x.toFixed(2), startOut.y.toFixed(2),
-    'A', rOut, rOut, 0, largeArcFlag, 1, endOut.x.toFixed(2), endOut.y.toFixed(2),
-    'L', endIn.x.toFixed(2), endIn.y.toFixed(2),
-    'A', rIn, rIn, 0, largeArcFlag, 0, startIn.x.toFixed(2), startIn.y.toFixed(2),
-    'Z'
-  ].join(' ');
-}
-
-function buildRadialDonutSvg() {
-  if (!donutSectorsGroup) return;
-  donutSectorsGroup.innerHTML = '';
-
-  const cx = 170;
-  const cy = 170;
-  const rIn = 88;
-  const rOut = 154;
-
-  // 1. Chronograph minute ticks
-  const ticksGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  ticksGroup.setAttribute('class', 'donut-ticks-group');
-  for (let i = 0; i < 60; i++) {
-    const angle = i * 6; // 6 deg per tick
-    const isMajor = i % 5 === 0;
-    const tickLen = isMajor ? 5 : 2.5;
-    const p1 = polarToCartesian(cx, cy, 158, angle);
-    const p2 = polarToCartesian(cx, cy, 158 + tickLen, angle);
-
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', p1.x.toFixed(2));
-    line.setAttribute('y1', p1.y.toFixed(2));
-    line.setAttribute('x2', p2.x.toFixed(2));
-    line.setAttribute('y2', p2.y.toFixed(2));
-    line.setAttribute('stroke', isMajor ? '#00f0ff' : 'rgba(0, 240, 255, 0.35)');
-    line.setAttribute('stroke-width', isMajor ? '1.2' : '0.8');
-    ticksGroup.appendChild(line);
-  }
-  donutSectorsGroup.appendChild(ticksGroup);
-
-  // 2. Partition sectors
-  RADIAL_SECTORS.forEach((sector) => {
-    // 60-degree sector with a 3-degree laser gap
-    const startAngle = sector.midAngle - 28.5;
-    const endAngle = sector.midAngle + 28.5;
-
-    const pathData = describeDonutSector(cx, cy, rIn, rOut, startAngle, endAngle);
-
-    // Positions for glyphs in sector
-    const tagPos = polarToCartesian(cx, cy, 142, sector.midAngle);
-    const iconPos = polarToCartesian(cx, cy, 124, sector.midAngle);
-    const labelPos = polarToCartesian(cx, cy, 102, sector.midAngle);
-
-    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    group.setAttribute('class', `donut-sector-group ${sector.isDanger ? 'sector-danger' : ''}`);
-    group.setAttribute('data-id', sector.id);
-
-    group.innerHTML = `
-      <path class="donut-sector-path" d="${pathData}" />
-      <g class="sector-glyph-group">
-        <text class="sector-svg-tag" x="${tagPos.x.toFixed(2)}" y="${tagPos.y.toFixed(2)}">${sector.tag}</text>
-        <text class="sector-svg-icon" x="${iconPos.x.toFixed(2)}" y="${iconPos.y.toFixed(2)}">${sector.icon}</text>
-        <text class="sector-svg-label" x="${labelPos.x.toFixed(2)}" y="${labelPos.y.toFixed(2)}">${sector.name}</text>
-      </g>
-    `;
-
-    donutSectorsGroup.appendChild(group);
-  });
-}
-
-function getSectorFromCoordinates(clientX, clientY) {
-  if (!donutWheelWrapper) return { zone: 'outside', sector: null };
-  const rect = donutWheelWrapper.getBoundingClientRect();
-  const cx = rect.left + rect.width / 2;
-  const cy = rect.top + rect.height / 2;
-  const dx = clientX - cx;
-  const dy = clientY - cy;
-  const dist = Math.sqrt(dx * dx + dy * dy);
-
-  // Scaled radii inside the DOM element
-  const scale = rect.width / 340;
-  const rInScaled = 86 * scale;
-  const rOutScaled = 160 * scale;
-
-  if (dist < rInScaled) {
-    return { zone: 'center', sector: null };
-  }
-  if (dist > rOutScaled + 24) {
-    return { zone: 'outside', sector: null };
-  }
-
-  // Calculate angle in degrees [-180, 180]
-  const deg = (Math.atan2(dy, dx) * 180) / Math.PI;
-
-  for (const s of RADIAL_SECTORS) {
-    let diff = deg - s.midAngle;
-    while (diff > 180) diff -= 360;
-    while (diff < -180) diff += 360;
-    if (Math.abs(diff) <= 30) {
-      return { zone: 'sector', sector: s };
-    }
-  }
-
-  return { zone: 'outside', sector: null };
-}
-
-function setActiveSector(sector) {
-  const newId = sector ? sector.id : null;
-  if (newId === activeHoveredSectorId) return;
-  activeHoveredSectorId = newId;
-
-  const groups = donutSectorsGroup.querySelectorAll('.donut-sector-group');
-  groups.forEach((g) => {
-    if (sector && g.dataset.id === sector.id) {
-      g.classList.add('active-sector');
-    } else {
-      g.classList.remove('active-sector');
-    }
-  });
-
-  if (sector) {
-    playJarvisTone(sector.freq);
-    donutCenterIcon.textContent = sector.icon;
-    donutCenterTitle.textContent = `// ${sector.name}`;
-    donutCenterInstruction.textContent = sector.subtitle;
-    donutFootText.textContent = `PROTOCOL: ${sector.name} [RELEASE OR CLICK TO ENGAGE]`;
-  } else {
-    donutCenterIcon.textContent = '🎯';
-    donutCenterTitle.textContent = '// ARMED & READY';
-    donutCenterInstruction.textContent = 'HOVER SECTOR OR DROP';
-    donutFootText.textContent = 'READY // HOVER OVER DESIRED CLOCK SECTOR';
-  }
-}
-
-function openRadialDonutModal(text = '') {
+function openHologramPods(text = '') {
   currentQuickText = (text || '').trim();
   closeAllDrawers();
 
   if (currentQuickText) {
-    const previewSnip = currentQuickText.length > 36 ? currentQuickText.slice(0, 36) + '...' : currentQuickText;
-    donutCenterPreview.textContent = previewSnip;
-    donutCenterPreview.title = currentQuickText;
+    const previewSnip = currentQuickText.length > 38 ? currentQuickText.slice(0, 38) + '...' : currentQuickText;
+    podsPreviewText.textContent = previewSnip;
+    podsPreviewText.title = currentQuickText;
   } else {
-    donutCenterPreview.textContent = 'Awaiting payload...';
+    podsPreviewText.textContent = 'AWAITING PAYLOAD // DROP TEXT DIRECTLY INTO A POD';
+    podsPreviewText.title = '';
   }
 
-  // Adjust URL sector label if payload is URL
+  // Contextualize Web Pod label if payload is a URL
   const isUrl = /^https?:\/\//i.test(currentQuickText);
-  const webSector = RADIAL_SECTORS.find((s) => s.id === 'weblink');
-  if (webSector) {
-    webSector.name = isUrl ? 'OPEN LINK' : 'SEARCH WEB';
-    webSector.subtitle = isUrl ? 'BROWSE TO URL' : 'QUERY GOOGLE';
-    const labelEl = donutSectorsGroup.querySelector(`.donut-sector-group[data-id="weblink"] .sector-svg-label`);
-    if (labelEl) labelEl.textContent = webSector.name;
+  const webPod = document.querySelector('.drop-pod[data-action="weblink"]');
+  if (webPod) {
+    const titleEl = webPod.querySelector('.pod-title');
+    const subEl = webPod.querySelector('.pod-sub');
+    if (titleEl) titleEl.textContent = isUrl ? 'OPEN WEB LINK' : 'WEB / LINK SEARCH';
+    if (subEl) subEl.textContent = isUrl ? 'DROP TO BROWSE DIRECTLY' : 'DROP TO OPEN URL OR QUERY GOOGLE';
   }
 
-  setActiveSector(null);
-  radialDonutModal.classList.add('open');
+  podsFootStatus.textContent = 'READY // RELEASE ANY TEXT DIRECTLY INTO A POD';
+  hologramPodsDrawer.classList.add('open');
   playJarvisSound('engage');
-  showToast('J.A.R.V.I.S. Radial Donut Dial Active');
+  showToast('J.A.R.V.I.S. Drop Pods Armed');
 
   if (window.dockAPI) {
     window.dockAPI.setIgnoreMouse(false);
   }
 }
 
-function closeRadialDonutModal() {
-  radialDonutModal.classList.remove('open');
-  setActiveSector(null);
+function closeHologramPods() {
+  hologramPodsDrawer.classList.remove('open');
+  dropPods.forEach((pod) => pod.classList.remove('drag-over'));
 }
 
-async function executeSectorAction(sectorId, payloadText = currentQuickText) {
-  const text = (payloadText || currentQuickText || '').trim();
+async function executePodAction(action, payloadText = currentQuickText) {
+  let text = (payloadText || currentQuickText || '').trim();
 
-  if (sectorId === 'dismiss') {
-    closeRadialDonutModal();
-    playJarvisSound('blip');
-    showToast('Protocol Cancelled');
-    return;
+  // If text is still empty, attempt to read from system clipboard
+  if (!text && window.dockAPI) {
+    const history = await window.dockAPI.getClipboardHistory();
+    if (history && history.length > 0) {
+      text = (history[0] || '').trim();
+    }
   }
 
-  if (!text && sectorId !== 'dismiss') {
+  if (!text) {
     showToast('Buffer empty - Copy or drag text to engage');
-    closeRadialDonutModal();
+    closeHologramPods();
     return;
   }
 
   playJarvisSound('engage');
 
-  switch (sectorId) {
+  switch (action) {
     case 'scratchpad': {
       const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const entry = `\n// [J.A.R.V.I.S. Radial Drop @ ${timeStr}]\n${text}\n`;
+      const entry = `\n// [J.A.R.V.I.S. Ingested @ ${timeStr}]\n${text}\n`;
       scratchpadText.value = (scratchpadText.value ? scratchpadText.value + '\n' : '') + entry;
       updateScratchpadCounter(scratchpadText.value);
       if (window.dockAPI) {
@@ -1354,10 +1150,11 @@ async function executeSectorAction(sectorId, payloadText = currentQuickText) {
     }
 
     case 'youtube': {
-      closeRadialDonutModal();
+      closeHologramPods();
       await openYtdlDrawer();
       ytdlQueryInput.value = text;
       ytdlSearchForm.dispatchEvent(new Event('submit'));
+      showToast('Media Stream Acquisition Engaged');
       return;
     }
 
@@ -1371,7 +1168,7 @@ async function executeSectorAction(sectorId, payloadText = currentQuickText) {
       } else {
         window.open(target, '_blank');
       }
-      showToast('Deploying Link Protocol...');
+      showToast('Deploying Navigation Protocol...');
       break;
     }
 
@@ -1398,168 +1195,101 @@ async function executeSectorAction(sectorId, payloadText = currentQuickText) {
     }
   }
 
-  closeRadialDonutModal();
+  closeHologramPods();
 }
 
-// Global Drag & Drop + Hold-Key Logic
-// Hologram appears while holding the key (Shift) during drag, disappears when unheld, and works in between
-let isDragging = false;
-let isShiftHolding = false;
-let isMouseHolding = false;
-
-window.addEventListener('dragstart', (e) => {
-  isDragging = true;
-  currentQuickText = window.getSelection().toString() || '';
-});
-
-window.addEventListener('dragend', () => {
-  isDragging = false;
-  closeRadialDonutModal();
-});
-
+// -------------------------------------------------------------
+// Effortless Drag & Drop Listeners (No awkward modifier keys!)
+// -------------------------------------------------------------
 window.addEventListener('dragenter', (e) => {
   e.preventDefault();
-  isDragging = true;
+  if (!hologramPodsDrawer.classList.contains('open')) {
+    openHologramPods(currentQuickText || window.getSelection().toString() || '');
+  }
 });
 
 window.addEventListener('dragover', (e) => {
   e.preventDefault();
-  isDragging = true;
   if (e.dataTransfer) {
     e.dataTransfer.dropEffect = 'copy';
   }
-
-  // Key condition: Hologram appears while holding Shift during drag, disappears when unheld
-  const isHoldingKey = e.shiftKey;
-
-  if (isHoldingKey) {
-    if (!radialDonutModal.classList.contains('open')) {
-      openRadialDonutModal(currentQuickText || window.getSelection().toString() || '');
-      donutCenterInstruction.textContent = 'HOLDING SHIFT // AIM AT SECTOR';
-      donutFootText.textContent = 'HOLD [SHIFT] ACTIVE // DROP OVER SECTOR TO ENGAGE';
-    }
-
-    // Works in between: hover each option smoothly
-    const result = getSectorFromCoordinates(e.clientX, e.clientY);
-    if (result.zone === 'sector') {
-      setActiveSector(result.sector);
-    } else {
-      setActiveSector(null);
-    }
-  } else {
-    // Disappears while unheld!
-    if (radialDonutModal.classList.contains('open')) {
-      closeRadialDonutModal();
-    }
+  if (!hologramPodsDrawer.classList.contains('open')) {
+    openHologramPods(currentQuickText || window.getSelection().toString() || '');
   }
 });
 
 window.addEventListener('dragleave', (e) => {
   if (!e.relatedTarget && (e.clientX <= 0 || e.clientY <= 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight)) {
-    isDragging = false;
-    closeRadialDonutModal();
+    closeHologramPods();
   }
 });
 
 window.addEventListener('drop', (e) => {
   e.preventDefault();
-  const wasOpen = radialDonutModal.classList.contains('open');
-  isDragging = false;
+  // If not dropped directly on a pod, gracefully close
+  if (!e.target.closest('.drop-pod')) {
+    closeHologramPods();
+  }
+});
 
-  if (wasOpen) {
+// Attach listeners to individual drop pods
+dropPods.forEach((pod) => {
+  const action = pod.dataset.action;
+  const freq = POD_FREQUENCIES[action] || 1500;
+
+  pod.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dropPods.forEach((p) => p.classList.remove('drag-over'));
+    pod.classList.add('drag-over');
+    playJarvisTone(freq);
+    podsFootStatus.textContent = `TARGET LOCKED: [${action.toUpperCase()}] // RELEASE TO ENGAGE`;
+  });
+
+  pod.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    if (!pod.classList.contains('drag-over')) {
+      dropPods.forEach((p) => p.classList.remove('drag-over'));
+      pod.classList.add('drag-over');
+      playJarvisTone(freq);
+    }
+  });
+
+  pod.addEventListener('dragleave', (e) => {
+    e.stopPropagation();
+    pod.classList.remove('drag-over');
+    podsFootStatus.textContent = 'READY // RELEASE ANY TEXT DIRECTLY INTO A POD';
+  });
+
+  pod.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    pod.classList.remove('drag-over');
+
     let droppedText = '';
     if (e.dataTransfer) {
-      droppedText = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text') || '';
+      droppedText = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text') || e.dataTransfer.getData('text/uri-list') || '';
     }
     if (!droppedText) {
       droppedText = currentQuickText;
     }
 
-    const result = getSectorFromCoordinates(e.clientX, e.clientY);
-    if (result.zone === 'sector' && result.sector) {
-      executeSectorAction(result.sector.id, droppedText);
-    } else {
-      closeRadialDonutModal();
-    }
-  }
+    executePodAction(action, droppedText);
+  });
+
+  // Direct Click Support: lets users click a pod to act on latest clipboard/preview text
+  pod.addEventListener('click', () => {
+    executePodAction(action, currentQuickText);
+  });
 });
 
-// Pointer & Click events on Donut Wheel (when opened via tool button or hotkey)
-donutWheelWrapper.addEventListener('mousemove', (e) => {
-  const result = getSectorFromCoordinates(e.clientX, e.clientY);
-  if (result.zone === 'sector') {
-    setActiveSector(result.sector);
-  } else {
-    setActiveSector(null);
-  }
-});
+closePodsBtn.addEventListener('click', closeHologramPods);
 
-// Hold mouse button & release over sector
-donutWheelWrapper.addEventListener('mousedown', () => {
-  isMouseHolding = true;
-});
-
-window.addEventListener('mouseup', (e) => {
-  if (isMouseHolding && radialDonutModal.classList.contains('open')) {
-    isMouseHolding = false;
-    const result = getSectorFromCoordinates(e.clientX, e.clientY);
-    if (result.zone === 'sector' && result.sector) {
-      executeSectorAction(result.sector.id, currentQuickText);
-    }
-  }
-  isMouseHolding = false;
-});
-
-// Click fallback
-donutWheelWrapper.addEventListener('click', (e) => {
-  const result = getSectorFromCoordinates(e.clientX, e.clientY);
-  if (result.zone === 'sector' && result.sector) {
-    executeSectorAction(result.sector.id, currentQuickText);
-  } else if (result.zone === 'center') {
-    closeRadialDonutModal();
-  }
-});
-
-// Key shortcut: ONLY works while dragging something!
-window.addEventListener('keydown', (e) => {
-  if (e.key === 'Shift' && !e.repeat) {
-    // Only works if dragging something
-    if (!isDragging) return;
-
-    isShiftHolding = true;
-    if (!radialDonutModal.classList.contains('open')) {
-      openRadialDonutModal(currentQuickText || window.getSelection().toString() || '');
-      donutCenterInstruction.textContent = 'HOLDING SHIFT // AIM AT SECTOR';
-      donutFootText.textContent = 'HOLD [SHIFT] ACTIVE // RELEASE OVER SECTOR TO FIRE';
-    }
-  }
-
-  if (e.key === 'Escape') {
-    closeRadialDonutModal();
-    closeAllDrawers();
-  }
-});
-
-window.addEventListener('keyup', (e) => {
-  if (e.key === 'Shift') {
-    // Unholding the key causes the hologram to disappear or fire if hovering an option!
-    if (radialDonutModal.classList.contains('open')) {
-      if (activeHoveredSectorId) {
-        executeSectorAction(activeHoveredSectorId, currentQuickText);
-      } else {
-        closeRadialDonutModal();
-        playJarvisSound('blip');
-      }
-    }
-    isShiftHolding = false;
-  }
-});
-
-closeDonutBtn.addEventListener('click', closeRadialDonutModal);
-
-toolDonutBtn.addEventListener('click', async () => {
-  if (radialDonutModal.classList.contains('open')) {
-    closeRadialDonutModal();
+toolPodsBtn.addEventListener('click', async () => {
+  if (hologramPodsDrawer.classList.contains('open')) {
+    closeHologramPods();
   } else {
     let text = '';
     if (window.dockAPI) {
@@ -1568,7 +1298,14 @@ toolDonutBtn.addEventListener('click', async () => {
         text = history[0];
       }
     }
-    openRadialDonutModal(text);
+    openHologramPods(text);
+  }
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeHologramPods();
+    closeAllDrawers();
   }
 });
 
