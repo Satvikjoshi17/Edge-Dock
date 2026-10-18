@@ -54,7 +54,6 @@ let currentSettings = {
   autoHide: false,
   hotkey: 'Alt+Space',
   launchOnBoot: true,
-  accentColor: '#00f0ff',
   showLabels: true
 };
 
@@ -125,7 +124,6 @@ const scratchpadSavedBadge = document.getElementById('scratchpad-saved-badge');
 // Settings Drawer
 const settingsDrawer = document.getElementById('settings-drawer');
 const segmentBtns = document.querySelectorAll('#position-segmented .segment-btn');
-const colorDots = document.querySelectorAll('.color-dot');
 const hotkeyInput = document.getElementById('hotkey-input');
 const saveHotkeyBtn = document.getElementById('save-hotkey-btn');
 const showLabelsSwitch = document.getElementById('show-labels-switch');
@@ -174,7 +172,7 @@ async function init() {
 
     window.dockAPI.onDownloadProgress((prog) => {
       downloadProgressBox.classList.remove('hidden');
-      downloadStatusText.textContent = `DOWNLOADING STREAM... ${prog.percent}%`;
+      downloadStatusText.textContent = `ACQUIRING STREAM... ${prog.percent}%`;
       downloadProgressFill.style.width = `${prog.percent}%`;
       downloadMetaText.textContent = `${prog.percent}% • ${prog.speed || '--'} • ETA ${prog.eta || '--'}`;
     });
@@ -212,23 +210,7 @@ function showToast(message) {
 }
 
 function applySettings(settings) {
-  // 1. Accent Color
-  if (settings.accentColor) {
-    document.documentElement.style.setProperty('--accent', settings.accentColor);
-    const hex = settings.accentColor.replace('#', '');
-    const r = parseInt(hex.substring(0, 2), 16) || 0;
-    const g = parseInt(hex.substring(2, 4), 16) || 240;
-    const b = parseInt(hex.substring(4, 6), 16) || 255;
-    document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.45)`);
-    document.documentElement.style.setProperty('--accent-dim', `rgba(${r}, ${g}, ${b}, 0.15)`);
-    document.documentElement.style.setProperty('--border-hud', `rgba(${r}, ${g}, ${b}, 0.28)`);
-
-    colorDots.forEach((dot) => {
-      dot.classList.toggle('active', dot.dataset.color.toLowerCase() === settings.accentColor.toLowerCase());
-    });
-  }
-
-  // 2. Dock Position
+  // 1. Dock Position
   if (settings.dockPosition === 'left') {
     bodyEl.classList.add('dock-left');
   } else {
@@ -238,7 +220,7 @@ function applySettings(settings) {
     btn.classList.toggle('active', btn.dataset.position === settings.dockPosition);
   });
 
-  // 3. Auto-Hide state
+  // 2. Auto-Hide state
   if (settings.autoHide) {
     bodyEl.classList.add('autohide-active');
     toggleAutoHideBtn.classList.add('active');
@@ -252,15 +234,15 @@ function applySettings(settings) {
     autohideSwitch.checked = false;
   }
 
-  // 4. Hotkey
+  // 3. Hotkey
   if (settings.hotkey) {
     hotkeyInput.value = settings.hotkey;
   }
 
-  // 5. Show Labels
+  // 4. Show Labels
   showLabelsSwitch.checked = settings.showLabels !== false;
 
-  // 6. Startup Launch
+  // 5. Startup Launch
   launchBootSwitch.checked = Boolean(settings.launchOnBoot);
 }
 
@@ -301,19 +283,6 @@ async function loadMissingIcons() {
   if (changed) {
     await window.dockAPI.saveShortcuts(shortcuts);
   }
-}
-
-// Compute smart monogram tag for visual distinction (e.g. CMD vs TERM)
-function getShortcutTag(item) {
-  if (item.tag) return item.tag;
-  const p = item.path.toLowerCase();
-  const n = item.name.toLowerCase();
-  if (p === 'cmd' || n.includes('cmd') || p.includes('cmd.exe')) return 'CMD';
-  if (p === 'wt' || n.includes('terminal') || p.includes('powershell')) return 'TERM';
-  if (p.includes('code') || n.includes('code')) return 'CODE';
-  if (p.startsWith('http')) return 'WEB';
-  if (p.includes('/') || p.includes('\\')) return 'DIR';
-  return (item.name.substring(0, 3)).toUpperCase();
 }
 
 function getIconElement(item) {
@@ -357,7 +326,7 @@ function createSvgElement(svgHtml) {
   return wrapper.firstChild;
 }
 
-// Render Launcher List with Distinct Labels & Tags
+// Render Launcher List (Clean, NO Corner Names, High-Tech HUD Labels)
 function renderShortcuts() {
   listContainer.innerHTML = '';
 
@@ -368,20 +337,13 @@ function renderShortcuts() {
     tile.setAttribute('draggable', 'true');
     tile.dataset.index = index;
 
-    // Tag (e.g. CMD vs TERM)
-    const tag = getShortcutTag(item);
-    const tagEl = document.createElement('span');
-    tagEl.className = 'tile-tag';
-    tagEl.textContent = tag;
-    tile.appendChild(tagEl);
-
     // Icon Container
     const iconWrapper = document.createElement('div');
     iconWrapper.className = 'cyber-tile-icon';
     iconWrapper.appendChild(getIconElement(item));
     tile.appendChild(iconWrapper);
 
-    // Name Label Underneath
+    // High-Tech Name Label Underneath
     if (currentSettings.showLabels !== false) {
       const label = document.createElement('span');
       label.className = 'tile-label';
@@ -519,10 +481,10 @@ function showContextMenu(x, y, item) {
   activeContextMenuTarget = item;
   contextMenu.style.top = `${Math.min(y, window.innerHeight - 150)}px`;
   if (currentSettings.dockPosition === 'left') {
-    contextMenu.style.left = '84px';
+    contextMenu.style.left = '86px';
     contextMenu.style.right = 'auto';
   } else {
-    contextMenu.style.right = '84px';
+    contextMenu.style.right = '86px';
     contextMenu.style.left = 'auto';
   }
   contextMenu.classList.add('visible');
@@ -787,7 +749,7 @@ async function triggerDownload(url, title) {
 
   playJarvisSound('engage');
   downloadProgressBox.classList.remove('hidden');
-  downloadStatusText.textContent = `ACQUIRING: ${title.substring(0, 28)}...`;
+  downloadStatusText.textContent = `ACQUIRING: ${title.substring(0, 26)}...`;
   downloadProgressFill.style.width = '0%';
   downloadMetaText.textContent = 'Engaging media pipeline...';
   showToast(`Initiating ${selectedDownloadFormat.toUpperCase()} download...`);
@@ -982,18 +944,6 @@ segmentBtns.forEach((btn) => {
     }
     applySettings(currentSettings);
     showToast(`HUD Anchored to ${currentSettings.dockPosition} Flank`);
-  });
-});
-
-colorDots.forEach((dot) => {
-  dot.addEventListener('click', async () => {
-    playJarvisSound('blip');
-    currentSettings.accentColor = dot.dataset.color;
-    if (window.dockAPI) {
-      await window.dockAPI.saveSettings(currentSettings);
-    }
-    applySettings(currentSettings);
-    showToast('Reactor Core Palette Reconfigured');
   });
 });
 

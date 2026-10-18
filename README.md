@@ -1,22 +1,24 @@
-# ⚡ EdgeDock // J.A.R.V.I.S. HUD
+# ⚡ EdgeDock // J.A.R.V.I.S. Open-Air Hologram HUD
 
-> A Stark Industries inspired holographic desktop quick-launcher & tactical productivity toolbox built with Electron.
+> An authentic Stark Industries open-air holographic desktop quick-launcher & tactical productivity toolbox built with Electron.
 
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=flat-square&logo=windows)
 ![Electron](https://img.shields.io/badge/Electron-31.0.0-47848F?style=flat-square&logo=electron)
+![HUD](https://img.shields.io/badge/Interface-J.A.R.V.I.S._Hologram-00f0ff?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-00f0ff?style=flat-square)
 
-EdgeDock transforms your desktop into an authentic, ultra-responsive **J.A.R.V.I.S. HUD** (Heads-Up Display). It combines non-intrusive edge-docked application launching with an interactive media acquisition engine, background data buffer (clipboard manager), and instant tactical memory scratchpad.
+EdgeDock transforms your Windows desktop into an authentic **Iron Man floating open-air holographic HUD**. Pinned applications, media search tools, and tactical utilities float seamlessly in translucent cyan glass with holographic scanlines, laser-sharp caliper brackets, and an animated Arc Reactor core.
 
 ---
 
-## 🦾 J.A.R.V.I.S. HUD Experience
+## 🦾 Holographic HUD Architecture
 
-- **⚡ Spinning Arc Reactor Core**: Animated, concentric spinning Arc Reactor in the HUD header with real-time status pulses and Stark telemetry readouts.
-- **🏷️ Distinct App Labels & Monogram Badges**: Every pinned tool displays a high-visibility designation label and monogram badge (`CMD`, `TERM`, `CODE`, `WEB`, `DIR`), instantly distinguishing tools with identical system icons (e.g. Command Prompt vs. Windows Terminal).
-- **🛡️ 100% Zero-Glitch Mouse Forwarding**: Fixed stable window dimensions paired with Electron's `setIgnoreMouseEvents` forwarder. Zero window jumping, zero flicker, and seamless click-through on transparent desktop areas.
+- **🌐 Translucent Open-Air Glass**: Floating glass overlay (`backdrop-filter: blur(22px)`) with subtle holographic scanlines and glowing laser edges.
+- **⚡ Spinning Multi-Ring Arc Reactor**: Concentric, counter-rotating HUD rings in the header with a pulsing white-hot core and radial aura.
+- **🏷️ Holographic Designation Labels**: Clean, glowing typography directly beneath each icon (`CMD`, `TERMINAL`, `VS CODE`, `GITHUB`) with high readability—no cluttered corner badges.
+- **🛡️ 100% Zero-Flicker Mouse Forwarding**: Fixed 380px stable window dimensions paired with Electron's `setIgnoreMouseEvents` forwarder. Zero window jumping, zero redraw flicker, and instant click-through on transparent desktop areas.
 - **🔊 Synthesized Tactical Audio**: Lightweight, zero-latency Web Audio sound blips and engagement chimes on hover and interactions.
-- **🌈 Reactor Core Palettes**: Reconfigure your HUD with 5 Stark themes: **Arc Reactor Cyan**, **Stark Gold / Amber**, **Mark LXXXV Crimson**, **Vibranium Green**, and **Quantum Violet**.
+- **📐 Screen Flank Switching**: Anchor your HUD to either the **Right Flank** or **Left Flank** of your screen.
 
 ---
 
@@ -36,7 +38,7 @@ EdgeDock transforms your desktop into an authentic, ultra-responsive **J.A.R.V.I
 ### 3. 📝 Tactical Scratchpad
 - **Zero-Latency Memory Buffer**: Ephemeral notes, API keys, JSON payloads, or curl commands right on your screen edge.
 - **Real-Time Auto-Save**: Seamlessly persisted across restarts and reboots.
-- **Telemetry Counter**: Live character and word counters.
+- **Telemetry Counter**: Live byte and token counters.
 
 ---
 
