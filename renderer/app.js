@@ -1071,6 +1071,7 @@ const RADIAL_SECTORS = [
     id: 'scratchpad',
     name: 'SCRATCHPAD',
     subtitle: 'ADD TO TACTICAL NOTES',
+    tag: 'SEC-01',
     icon: '📝',
     midAngle: -90, // 12 o'clock
     freq: 1400
@@ -1079,6 +1080,7 @@ const RADIAL_SECTORS = [
     id: 'clipboard',
     name: 'CLIPBOARD',
     subtitle: 'BUFFER TO MEMORY',
+    tag: 'SEC-02',
     icon: '📋',
     midAngle: -30, // 2 o'clock
     freq: 1550
@@ -1087,6 +1089,7 @@ const RADIAL_SECTORS = [
     id: 'youtube',
     name: 'YOUTUBE',
     subtitle: 'ACQUIRE VIDEO STREAM',
+    tag: 'SEC-03',
     icon: '🎬',
     midAngle: 30, // 4 o'clock
     freq: 1700
@@ -1095,6 +1098,7 @@ const RADIAL_SECTORS = [
     id: 'weblink',
     name: 'OPEN URL',
     subtitle: 'BROWSE OR NAVIGATE',
+    tag: 'SEC-04',
     icon: '🌐',
     midAngle: 90, // 6 o'clock
     freq: 1850
@@ -1103,6 +1107,7 @@ const RADIAL_SECTORS = [
     id: 'voice',
     name: 'JARVIS VOICE',
     subtitle: 'VOCAL SYNTHESIS',
+    tag: 'SEC-05',
     icon: '🗣️',
     midAngle: 150, // 8 o'clock
     freq: 2000
@@ -1111,6 +1116,7 @@ const RADIAL_SECTORS = [
     id: 'dismiss',
     name: 'DISMISS',
     subtitle: 'ABORT PROTOCOL',
+    tag: 'SEC-06',
     icon: '✕',
     midAngle: 210, // 10 o'clock
     isDanger: true,
@@ -1154,6 +1160,28 @@ function buildRadialDonutSvg() {
   const rIn = 88;
   const rOut = 154;
 
+  // 1. Chronograph minute ticks
+  const ticksGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  ticksGroup.setAttribute('class', 'donut-ticks-group');
+  for (let i = 0; i < 60; i++) {
+    const angle = i * 6; // 6 deg per tick
+    const isMajor = i % 5 === 0;
+    const tickLen = isMajor ? 5 : 2.5;
+    const p1 = polarToCartesian(cx, cy, 158, angle);
+    const p2 = polarToCartesian(cx, cy, 158 + tickLen, angle);
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', p1.x.toFixed(2));
+    line.setAttribute('y1', p1.y.toFixed(2));
+    line.setAttribute('x2', p2.x.toFixed(2));
+    line.setAttribute('y2', p2.y.toFixed(2));
+    line.setAttribute('stroke', isMajor ? '#00f0ff' : 'rgba(0, 240, 255, 0.35)');
+    line.setAttribute('stroke-width', isMajor ? '1.2' : '0.8');
+    ticksGroup.appendChild(line);
+  }
+  donutSectorsGroup.appendChild(ticksGroup);
+
+  // 2. Partition sectors
   RADIAL_SECTORS.forEach((sector) => {
     // 60-degree sector with a 3-degree laser gap
     const startAngle = sector.midAngle - 28.5;
@@ -1162,8 +1190,9 @@ function buildRadialDonutSvg() {
     const pathData = describeDonutSector(cx, cy, rIn, rOut, startAngle, endAngle);
 
     // Positions for glyphs in sector
-    const iconPos = polarToCartesian(cx, cy, 126, sector.midAngle);
-    const labelPos = polarToCartesian(cx, cy, 104, sector.midAngle);
+    const tagPos = polarToCartesian(cx, cy, 142, sector.midAngle);
+    const iconPos = polarToCartesian(cx, cy, 124, sector.midAngle);
+    const labelPos = polarToCartesian(cx, cy, 102, sector.midAngle);
 
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     group.setAttribute('class', `donut-sector-group ${sector.isDanger ? 'sector-danger' : ''}`);
@@ -1172,6 +1201,7 @@ function buildRadialDonutSvg() {
     group.innerHTML = `
       <path class="donut-sector-path" d="${pathData}" />
       <g class="sector-glyph-group">
+        <text class="sector-svg-tag" x="${tagPos.x.toFixed(2)}" y="${tagPos.y.toFixed(2)}">${sector.tag}</text>
         <text class="sector-svg-icon" x="${iconPos.x.toFixed(2)}" y="${iconPos.y.toFixed(2)}">${sector.icon}</text>
         <text class="sector-svg-label" x="${labelPos.x.toFixed(2)}" y="${labelPos.y.toFixed(2)}">${sector.name}</text>
       </g>
@@ -1420,7 +1450,10 @@ window.addEventListener('drop', (e) => {
   }
 });
 
-// Pointer & Click events on Donut Wheel
+// Pointer, Mouse-Hold, and Click events on Donut Wheel
+let isShiftHolding = false;
+let isMouseHolding = false;
+
 donutWheelWrapper.addEventListener('mousemove', (e) => {
   const result = getSectorFromCoordinates(e.clientX, e.clientY);
   if (result.zone === 'sector') {
@@ -1430,12 +1463,67 @@ donutWheelWrapper.addEventListener('mousemove', (e) => {
   }
 });
 
+// Hold mouse button & release over sector
+donutWheelWrapper.addEventListener('mousedown', () => {
+  isMouseHolding = true;
+});
+
+window.addEventListener('mouseup', (e) => {
+  if (isMouseHolding && radialDonutModal.classList.contains('open')) {
+    isMouseHolding = false;
+    const result = getSectorFromCoordinates(e.clientX, e.clientY);
+    if (result.zone === 'sector' && result.sector) {
+      executeSectorAction(result.sector.id, currentQuickText);
+    }
+  }
+  isMouseHolding = false;
+});
+
+// Click fallback
 donutWheelWrapper.addEventListener('click', (e) => {
   const result = getSectorFromCoordinates(e.clientX, e.clientY);
   if (result.zone === 'sector' && result.sector) {
     executeSectorAction(result.sector.id, currentQuickText);
   } else if (result.zone === 'center') {
     closeRadialDonutModal();
+  }
+});
+
+// Hold Shift key to keep hologram open, release to execute!
+window.addEventListener('keydown', async (e) => {
+  const isTyping = ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
+  if (e.key === 'Shift' && !e.repeat && !isTyping) {
+    isShiftHolding = true;
+    if (!radialDonutModal.classList.contains('open')) {
+      let text = window.getSelection().toString() || '';
+      if (!text && window.dockAPI) {
+        const history = await window.dockAPI.getClipboardHistory();
+        if (history && history.length > 0) text = history[0];
+      }
+      openRadialDonutModal(text);
+      donutCenterInstruction.textContent = 'HOLDING SHIFT // AIM AT SECTOR';
+      donutFootText.textContent = 'HOLD [SHIFT] ACTIVE // RELEASE KEY OVER SECTOR TO FIRE';
+    }
+  }
+
+  if (e.key === 'Escape') {
+    closeRadialDonutModal();
+    closeAllDrawers();
+  }
+});
+
+window.addEventListener('keyup', (e) => {
+  if (e.key === 'Shift') {
+    if (isShiftHolding && radialDonutModal.classList.contains('open')) {
+      isShiftHolding = false;
+      if (activeHoveredSectorId) {
+        executeSectorAction(activeHoveredSectorId, currentQuickText);
+      } else {
+        closeRadialDonutModal();
+        playJarvisSound('blip');
+      }
+    }
+    isShiftHolding = false;
   }
 });
 
