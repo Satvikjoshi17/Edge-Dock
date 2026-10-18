@@ -526,7 +526,7 @@ ipcMain.handle('launch-target', async (event, targetPath) => {
 ipcMain.handle('update-hotkey', (event, hotkey) => {
   if (store && hotkey) {
     const settings = getSettings();
-    settings.hotkey = hotkey;
+    settings.hotkey = sanitizeAccelerator(hotkey, 'Alt+Space');
     store.set('settings', settings);
     registerGlobalHotkeys();
     return true;
@@ -537,7 +537,7 @@ ipcMain.handle('update-hotkey', (event, hotkey) => {
 ipcMain.handle('update-quick-hotkey', (event, hotkey) => {
   if (store && hotkey) {
     const settings = getSettings();
-    settings.quickHotkey = hotkey;
+    settings.quickHotkey = sanitizeAccelerator(hotkey, 'Alt+Q');
     store.set('settings', settings);
     registerGlobalHotkeys();
     return true;
@@ -659,61 +659,6 @@ ipcMain.on('set-expanded', (event, expanded) => {
   // Handled via CSS drawers with fixed stable window
 });
 
-ipcMain.handle('update-hotkey', (event, hotkey) => {
-  const sanitized = sanitizeAccelerator(hotkey, 'Alt+Space');
-  try {
-    const currentSettings = getSettings();
-    if (currentSettings.hotkey) {
-      try { globalShortcut.unregister(currentSettings.hotkey); } catch {}
-    }
-    const success = globalShortcut.register(sanitized, () => {
-      toggleSidebar();
-    });
-    if (success) {
-      currentSettings.hotkey = sanitized;
-      if (store) store.set('settings', currentSettings);
-      return true;
-    }
-    return false;
-  } catch (err) {
-    console.error('Failed to update main hotkey:', err);
-    return false;
-  }
-});
-
-ipcMain.handle('update-quick-hotkey', (event, hotkey) => {
-  const sanitized = sanitizeAccelerator(hotkey, 'Alt+Q');
-  try {
-    const currentSettings = getSettings();
-    if (currentSettings.quickHotkey) {
-      try { globalShortcut.unregister(currentSettings.quickHotkey); } catch {}
-    }
-    const success = globalShortcut.register(sanitized, () => {
-      summonQuickAction();
-    });
-    if (success) {
-      currentSettings.quickHotkey = sanitized;
-      if (store) store.set('settings', currentSettings);
-      return true;
-    }
-    return false;
-  } catch (err) {
-    console.error('Failed to update quick hotkey:', err);
-    return false;
-  }
-});
-
-ipcMain.handle('set-login-item', (event, enable) => {
-  try {
-    app.setLoginItemSettings({
-      openAtLogin: Boolean(enable),
-      path: app.getPath('exe')
-    });
-    return true;
-  } catch {
-    return false;
-  }
-});
 
 // -------------------------------------------------------------
 // IPC: Power Tool - Clipboard History
