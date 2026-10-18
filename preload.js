@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('dockAPI', {
   setExpanded: (expanded) => ipcRenderer.send('set-expanded', expanded),
   setIgnoreMouse: (ignore) => ipcRenderer.send('set-ignore-mouse', ignore),
   updateHotkey: (hotkey) => ipcRenderer.invoke('update-hotkey', hotkey),
+  updateQuickHotkey: (hotkey) => ipcRenderer.invoke('update-quick-hotkey', hotkey),
   setLoginItem: (enable) => ipcRenderer.invoke('set-login-item', enable),
   hideWindow: () => ipcRenderer.send('hide-window'),
 
@@ -36,5 +37,8 @@ contextBridge.exposeInMainWorld('dockAPI', {
   openDownloadsFolder: () => ipcRenderer.invoke('open-downloads-folder'),
   onDownloadProgress: (callback) => ipcRenderer.on('download-progress', (event, data) => callback(data)),
   onDownloadComplete: (callback) => ipcRenderer.on('download-complete', (event, data) => callback(data)),
-  onSetupProgress: (callback) => ipcRenderer.on('setup-progress', (event, data) => callback(data))
+  onSetupProgress: (callback) => ipcRenderer.on('setup-progress', (event, data) => callback(data)),
+
+  // J.A.R.V.I.S. Quick-Action Hologram Trigger
+  onSummonQuickAction: (callback) => ipcRenderer.on('summon-quick-action', (event, text) => callback(text))
 });

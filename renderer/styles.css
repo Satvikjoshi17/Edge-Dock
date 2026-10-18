@@ -1073,3 +1073,144 @@ body.dock-left .toast-msg {
   opacity: 1;
   transform: translateY(0);
 }
+
+/* J.A.R.V.I.S. QUICK-ACTION TACTICAL HOLOGRAM MODAL */
+.quick-hologram-modal {
+  position: fixed;
+  top: 50%;
+  right: 86px;
+  transform: translateY(-50%) scale(0.96);
+  width: 284px;
+  background: var(--jarvis-drawer-glass);
+  backdrop-filter: blur(26px) saturate(240%);
+  -webkit-backdrop-filter: blur(26px) saturate(240%);
+  border: 1px solid var(--border-laser-bright);
+  border-radius: 8px;
+  padding: 14px;
+  box-shadow: 0 0 40px rgba(0, 240, 255, 0.35), inset 0 0 20px rgba(0, 240, 255, 0.1), -10px 10px 40px rgba(0, 0, 0, 0.7);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 2500;
+  display: flex;
+  flex-direction: column;
+}
+
+body.dock-left .quick-hologram-modal {
+  right: auto;
+  left: 86px;
+  box-shadow: 0 0 40px rgba(0, 240, 255, 0.35), inset 0 0 20px rgba(0, 240, 255, 0.1), 10px 10px 40px rgba(0, 0, 0, 0.7);
+}
+
+.quick-hologram-modal.open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%) scale(1);
+}
+
+.hologram-modal-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.25);
+}
+
+.modal-arc-tag {
+  font-family: 'Orbitron', monospace;
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--jarvis-cyan);
+  letter-spacing: 1px;
+  text-shadow: 0 0 10px var(--jarvis-glow);
+}
+
+.hologram-preview-box {
+  background: rgba(0, 16, 34, 0.7);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 12px;
+}
+
+.preview-tag-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.preview-tag {
+  font-family: 'Orbitron', monospace;
+  font-size: 7.5px;
+  font-weight: 800;
+  color: var(--jarvis-cyan);
+  letter-spacing: 0.8px;
+}
+
+.preview-stats {
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--stark-gold);
+}
+
+.quick-text-preview {
+  font-family: Consolas, monospace;
+  font-size: 10.5px;
+  color: #fff;
+  max-height: 60px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.35;
+  scrollbar-width: thin;
+}
+
+.quick-actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.quick-action-tile {
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  border-radius: 6px;
+  padding: 8px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  color: var(--text-hologram);
+}
+
+.quick-action-tile .action-icon {
+  font-size: 14px;
+}
+
+.quick-action-tile .action-name {
+  font-family: 'Orbitron', monospace;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-align: center;
+}
+
+.quick-action-tile:hover {
+  background: var(--jarvis-cyan);
+  color: #010a14;
+  border-color: var(--jarvis-cyan);
+  box-shadow: 0 0 16px var(--jarvis-glow);
+  transform: translateY(-2px);
+}
+
+.quick-action-tile.danger:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+  box-shadow: 0 0 16px rgba(255, 42, 109, 0.6);
+}

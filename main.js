@@ -18,21 +18,22 @@ let store = null;
 
 // Fixed stable window size - prevents any hover flicker / position jumping
 const WINDOW_WIDTH = 380;
-const DOCK_WIDTH = 76;
+const DOCK_WIDTH = 78;
 
 const defaultShortcuts = [
-  { id: '1', name: 'VS Code', path: 'code', iconType: 'svg', icon: 'code', tag: 'CODE' },
-  { id: '2', name: 'GitHub', path: 'https://github.com', iconType: 'url', icon: 'web', tag: 'WEB' },
-  { id: '3', name: 'Terminal', path: 'wt', iconType: 'svg', icon: 'terminal', tag: 'TERM' },
-  { id: '4', name: 'Command Prompt', path: 'cmd', iconType: 'svg', icon: 'terminal', tag: 'CMD' }
+  { id: '1', name: 'VS Code', path: 'code', iconType: 'svg', icon: 'code' },
+  { id: '2', name: 'GitHub', path: 'https://github.com', iconType: 'url', icon: 'web' },
+  { id: '3', name: 'Terminal', path: 'wt', iconType: 'svg', icon: 'terminal' },
+  { id: '4', name: 'Command Prompt', path: 'cmd', iconType: 'svg', icon: 'terminal' }
 ];
 
 const defaultSettings = {
   dockPosition: 'right', // 'right' | 'left'
   autoHide: false,
   hotkey: 'Alt+Space',
+  quickHotkey: 'Alt+Q',
   launchOnBoot: true,
-  accentColor: '#00f0ff', // JARVIS Arc-Reactor Cyan
+  accentColor: '#00f0ff',
   showLabels: true
 };
 
@@ -83,14 +84,12 @@ function createSidebar() {
 
   mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
 
-  // Start with forwarding enabled for transparent area
   mainWindow.webContents.on('did-finish-load', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.setIgnoreMouseEvents(true, { forward: true });
     }
   });
 
-  // Multi-monitor and resolution listeners
   screen.on('display-metrics-changed', updateWindowBounds);
   screen.on('display-added', updateWindowBounds);
   screen.on('display-removed', updateWindowBounds);
@@ -112,22 +111,40 @@ function createSidebar() {
   });
 }
 
-function registerHotkey(newHotkey) {
+function registerGlobalHotkeys() {
   globalShortcut.unregisterAll();
-  const hotkey = newHotkey || getSettings().hotkey || 'Alt+Space';
+  const settings = getSettings();
+  const mainHotkey = settings.hotkey || 'Alt+Space';
+  const quickHotkey = settings.quickHotkey || 'Alt+Q';
+
   try {
-    const registered = globalShortcut.register(hotkey, () => {
+    globalShortcut.register(mainHotkey, () => {
       toggleSidebar();
     });
-    if (!registered) {
-      console.warn(`Global shortcut ${hotkey} registration failed.`);
-      return false;
-    }
-    return true;
   } catch (err) {
-    console.error('Failed to register global hotkey:', err);
-    return false;
+    console.error('Failed to register main hotkey:', err);
   }
+
+  try {
+    globalShortcut.register(quickHotkey, () => {
+      summonQuickAction();
+    });
+  } catch (err) {
+    console.error('Failed to register quick action hotkey:', err);
+  }
+}
+
+function summonQuickAction() {
+  if (!mainWindow) return;
+  const currentText = clipboard.readText() || '';
+  if (!isVisible) {
+    updateWindowBounds();
+    mainWindow.show();
+    isVisible = true;
+  }
+  mainWindow.focus();
+  mainWindow.setIgnoreMouseEvents(false);
+  mainWindow.webContents.send('summon-quick-action', currentText);
 }
 
 function createTray() {
@@ -150,11 +167,15 @@ function createTray() {
     const settings = getSettings();
     const contextMenu = Menu.buildFromTemplate([
       {
-        label: `J.A.R.V.I.S. Core (${settings.hotkey})`,
+        label: `J.A.R.V.I.S. HUD (${settings.hotkey})`,
         click: () => toggleSidebar()
       },
       {
-        label: settings.autoHide ? 'Auto-Hide: Active' : 'Auto-Hide: Off',
+        label: `Quick Hologram Action (${settings.quickHotkey || 'Alt+Q'})`,
+        click: () => summonQuickAction()
+      },
+      {
+        label: settings.autoHide ? 'Auto-Cloak: Active' : 'Auto-Cloak: Off',
         type: 'checkbox',
         checked: settings.autoHide,
         click: () => {
@@ -168,10 +189,10 @@ function createTray() {
         }
       },
       {
-        label: `HUD Anchor: ${settings.dockPosition === 'left' ? 'Left Edge' : 'Right Edge'}`,
+        label: `HUD Anchor: ${settings.dockPosition === 'left' ? 'Left Flank' : 'Right Flank'}`,
         submenu: [
           {
-            label: 'Right Edge',
+            label: 'Right Flank',
             type: 'radio',
             checked: settings.dockPosition === 'right',
             click: () => {
@@ -185,7 +206,7 @@ function createTray() {
             }
           },
           {
-            label: 'Left Edge',
+            label: 'Left Flank',
             type: 'radio',
             checked: settings.dockPosition === 'left',
             click: () => {
@@ -212,7 +233,7 @@ function createTray() {
     tray.setContextMenu(contextMenu);
   }
 
-  tray.setToolTip('EdgeDock - J.A.R.V.I.S. HUD');
+  tray.setToolTip('EdgeDock - J.A.R.V.I.S. Hologram HUD');
   rebuildContextMenu();
 
   tray.on('click', () => {
@@ -233,7 +254,6 @@ function toggleSidebar() {
   }
 }
 
-// Second instance focus
 app.on('second-instance', () => {
   if (mainWindow) {
     if (!isVisible) {
@@ -244,9 +264,7 @@ app.on('second-instance', () => {
   }
 });
 
-// -------------------------------------------------------------
-// Mouse Event Forwarding (Fixes hover glitch completely)
-// -------------------------------------------------------------
+// Mouse Event Forwarding
 ipcMain.on('set-ignore-mouse', (event, ignore) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.setIgnoreMouseEvents(Boolean(ignore), { forward: true });
@@ -349,7 +367,6 @@ ipcMain.handle('search-youtube', async (event, query) => {
   if (!query || typeof query !== 'string') return [];
   const trimmed = query.trim();
 
-  // If direct URL, return oembed info
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     return new Promise((resolve) => {
       const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(trimmed)}&format=json`;
@@ -384,7 +401,6 @@ ipcMain.handle('search-youtube', async (event, query) => {
     });
   }
 
-  // Fast search scrape
   return new Promise((resolve) => {
     const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(trimmed)}`;
     https.get(searchUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } }, (res) => {
@@ -453,7 +469,7 @@ app.whenReady().then(async () => {
 
   createSidebar();
   createTray();
-  registerHotkey();
+  registerGlobalHotkeys();
   startClipboardMonitor();
 });
 
@@ -496,15 +512,27 @@ ipcMain.handle('launch-target', async (event, targetPath) => {
   }
 });
 
-// IPC: Hotkey Update
+// IPC: Hotkey Updates
 ipcMain.handle('update-hotkey', (event, hotkey) => {
-  const success = registerHotkey(hotkey);
-  if (success && store) {
+  if (store && hotkey) {
     const settings = getSettings();
     settings.hotkey = hotkey;
     store.set('settings', settings);
+    registerGlobalHotkeys();
+    return true;
   }
-  return success;
+  return false;
+});
+
+ipcMain.handle('update-quick-hotkey', (event, hotkey) => {
+  if (store && hotkey) {
+    const settings = getSettings();
+    settings.quickHotkey = hotkey;
+    store.set('settings', settings);
+    registerGlobalHotkeys();
+    return true;
+  }
+  return false;
 });
 
 // IPC: Toggle Startup Launch
@@ -683,7 +711,7 @@ ipcMain.handle('start-media-download', async (event, { url, format }) => {
   try {
     const binary = resolveYtdlPath();
     if (!binary) {
-      return { success: false, error: 'J.A.R.V.I.S. Media Core offline. Click "Initiate Core Protocol" to download yt-dlp engine.' };
+      return { success: false, error: 'J.A.R.V.I.S. Media Core offline. Click "INITIALIZE CORE" to download yt-dlp engine.' };
     }
 
     if (!url || typeof url !== 'string') {

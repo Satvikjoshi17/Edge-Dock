@@ -200,10 +200,18 @@
       </div>
 
       <div class="form-group">
-        <label for="hotkey-input">Global Activation Hotkey</label>
+        <label for="hotkey-input">Main Activation Hotkey</label>
         <div class="form-input-row">
           <input type="text" id="hotkey-input" class="hud-input" value="Alt+Space" />
           <button type="button" id="save-hotkey-btn" class="hud-browse-btn">SYNC</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="quick-hotkey-input">Tactical Quick-Action Hotkey</label>
+        <div class="form-input-row">
+          <input type="text" id="quick-hotkey-input" class="hud-input" value="Alt+Q" />
+          <button type="button" id="save-quick-hotkey-btn" class="hud-browse-btn">SYNC</button>
         </div>
       </div>
 
@@ -233,6 +241,55 @@
     </div>
     <div class="drawer-actions">
       <button type="button" id="close-settings-btn" class="hud-btn primary">DISMISS</button>
+    </div>
+  </div>
+
+  <!-- J.A.R.V.I.S. Quick-Action Hologram Modal (Triggered by Alt+Q on selected text) -->
+  <div id="quick-hologram-modal" class="quick-hologram-modal">
+    <div class="hologram-modal-header">
+      <div class="modal-arc-tag">// TACTICAL DATA EXTRACTOR</div>
+      <button type="button" id="close-quick-modal-btn" class="hud-mini-btn">✕</button>
+      <div class="hud-caliper-tl"></div><div class="hud-caliper-br"></div>
+    </div>
+
+    <div class="hologram-preview-box">
+      <div class="preview-tag-row">
+        <span class="preview-tag">CAPTURED BUFFER:</span>
+        <span id="quick-preview-stats" class="preview-stats">0 CHARS</span>
+      </div>
+      <div id="quick-text-preview" class="quick-text-preview">No active text in buffer</div>
+    </div>
+
+    <div class="quick-actions-grid">
+      <button type="button" id="quick-act-scratchpad" class="quick-action-tile">
+        <span class="action-icon">📝</span>
+        <span class="action-name">TO SCRATCHPAD</span>
+      </button>
+
+      <button type="button" id="quick-act-clipboard" class="quick-action-tile">
+        <span class="action-icon">📋</span>
+        <span class="action-name">TO BUFFER</span>
+      </button>
+
+      <button type="button" id="quick-act-ytdl" class="quick-action-tile">
+        <span class="action-icon">🎬</span>
+        <span class="action-name">SCAN YOUTUBE</span>
+      </button>
+
+      <button type="button" id="quick-act-url" class="quick-action-tile">
+        <span class="action-icon">🌐</span>
+        <span class="action-name">OPEN LINK</span>
+      </button>
+
+      <button type="button" id="quick-act-speak" class="quick-action-tile">
+        <span class="action-icon">🗣️</span>
+        <span class="action-name">JARVIS VOCAL</span>
+      </button>
+
+      <button type="button" id="quick-act-dismiss" class="quick-action-tile danger">
+        <span class="action-icon">✕</span>
+        <span class="action-name">DISMISS</span>
+      </button>
     </div>
   </div>
 

@@ -53,6 +53,7 @@ let currentSettings = {
   dockPosition: 'right',
   autoHide: false,
   hotkey: 'Alt+Space',
+  quickHotkey: 'Alt+Q',
   launchOnBoot: true,
   showLabels: true
 };
@@ -64,6 +65,7 @@ let selectedDownloadFormat = 'mp4';
 let clipboardCache = [];
 let scratchpadSaveTimeout = null;
 let isCapturingMouse = true;
+let currentQuickText = '';
 
 // DOM Elements
 const bodyEl = document.getElementById('dock-body');
@@ -126,10 +128,24 @@ const settingsDrawer = document.getElementById('settings-drawer');
 const segmentBtns = document.querySelectorAll('#position-segmented .segment-btn');
 const hotkeyInput = document.getElementById('hotkey-input');
 const saveHotkeyBtn = document.getElementById('save-hotkey-btn');
+const quickHotkeyInput = document.getElementById('quick-hotkey-input');
+const saveQuickHotkeyBtn = document.getElementById('save-quick-hotkey-btn');
 const showLabelsSwitch = document.getElementById('show-labels-switch');
 const launchBootSwitch = document.getElementById('launch-boot-switch');
 const autohideSwitch = document.getElementById('autohide-switch');
 const closeSettingsBtn = document.getElementById('close-settings-btn');
+
+// Quick-Action Hologram Modal
+const quickHologramModal = document.getElementById('quick-hologram-modal');
+const closeQuickModalBtn = document.getElementById('close-quick-modal-btn');
+const quickTextPreview = document.getElementById('quick-text-preview');
+const quickPreviewStats = document.getElementById('quick-preview-stats');
+const quickActScratchpad = document.getElementById('quick-act-scratchpad');
+const quickActClipboard = document.getElementById('quick-act-clipboard');
+const quickActYtdl = document.getElementById('quick-act-ytdl');
+const quickActUrl = document.getElementById('quick-act-url');
+const quickActSpeak = document.getElementById('quick-act-speak');
+const quickActDismiss = document.getElementById('quick-act-dismiss');
 
 // Context Menu & Toast
 const contextMenu = document.getElementById('context-menu');
@@ -139,7 +155,7 @@ const ctxEdit = document.getElementById('ctx-edit');
 const ctxDelete = document.getElementById('ctx-delete');
 const toastEl = document.getElementById('toast');
 
-const allDrawers = [drawer, settingsDrawer, ytdlDrawer, clipboardDrawer, scratchpadDrawer];
+const allDrawers = [drawer, settingsDrawer, ytdlDrawer, clipboardDrawer, scratchpadDrawer, quickHologramModal];
 
 // -------------------------------------------------------------
 // Mouse Event Forwarding (Permanent fix for hover glitch)
@@ -194,6 +210,10 @@ async function init() {
       setupProgressFill.style.width = `${data.percent}%`;
       installEngineBtn.textContent = `SYNCHRONIZING CORE... ${data.percent}%`;
     });
+
+    window.dockAPI.onSummonQuickAction((text) => {
+      handleSummonQuickAction(text);
+    });
   }
 
   applySettings(currentSettings);
@@ -237,6 +257,9 @@ function applySettings(settings) {
   // 3. Hotkey
   if (settings.hotkey) {
     hotkeyInput.value = settings.hotkey;
+  }
+  if (settings.quickHotkey && quickHotkeyInput) {
+    quickHotkeyInput.value = settings.quickHotkey;
   }
 
   // 4. Show Labels
@@ -963,9 +986,25 @@ saveHotkeyBtn.addEventListener('click', async () => {
     if (success) {
       playJarvisSound('engage');
       currentSettings.hotkey = hotkey;
+      await window.dockAPI.saveSettings(currentSettings);
       showToast(`Activation Key Calibrated: ${hotkey}`);
     } else {
       showToast('Hotkey Conflict or Reserved');
+    }
+  }
+});
+
+saveQuickHotkeyBtn.addEventListener('click', async () => {
+  const quickHotkey = quickHotkeyInput.value.trim();
+  if (quickHotkey && window.dockAPI) {
+    const success = await window.dockAPI.updateQuickHotkey(quickHotkey);
+    if (success) {
+      playJarvisSound('engage');
+      currentSettings.quickHotkey = quickHotkey;
+      await window.dockAPI.saveSettings(currentSettings);
+      showToast(`Quick Action Key Calibrated: ${quickHotkey}`);
+    } else {
+      showToast('Quick Hotkey Conflict or Reserved');
     }
   }
 });
@@ -999,6 +1038,132 @@ toggleAutoHideBtn.addEventListener('click', async () => {
 closeBtn.addEventListener('click', () => {
   if (window.dockAPI) {
     window.dockAPI.hideWindow();
+  }
+});
+
+// -------------------------------------------------------------
+// J.A.R.V.I.S. Quick-Action Hologram Modal Handlers
+// -------------------------------------------------------------
+function handleSummonQuickAction(text) {
+  currentQuickText = (text || '').trim();
+  closeAllDrawers();
+
+  if (currentQuickText) {
+    quickTextPreview.textContent = currentQuickText;
+    const charCount = currentQuickText.length;
+    const wordCount = currentQuickText.split(/\s+/).filter(Boolean).length;
+    quickPreviewStats.textContent = `${charCount} CHARS // ${wordCount} TOKENS`;
+  } else {
+    quickTextPreview.textContent = '// BUFFER EMPTY: Select text in any window and press Alt+Q (or copy text).';
+    quickPreviewStats.textContent = '0 CHARS // 0 TOKENS';
+  }
+
+  const isUrl = /^https?:\/\//i.test(currentQuickText);
+  const urlLabel = quickActUrl.querySelector('.action-name');
+  if (urlLabel) {
+    urlLabel.textContent = isUrl ? 'OPEN LINK' : 'SEARCH WEB';
+  }
+
+  quickHologramModal.classList.add('open');
+  playJarvisSound('engage');
+  showToast('J.A.R.V.I.S. Tactical Extractor Engaged');
+}
+
+closeQuickModalBtn.addEventListener('click', () => {
+  quickHologramModal.classList.remove('open');
+});
+
+quickActDismiss.addEventListener('click', () => {
+  quickHologramModal.classList.remove('open');
+});
+
+quickActScratchpad.addEventListener('click', async () => {
+  if (!currentQuickText) {
+    showToast('Buffer is empty');
+    return;
+  }
+  playJarvisSound('engage');
+  const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const entry = `\n// [J.A.R.V.I.S. Extracted @ ${timeStr}]\n${currentQuickText}\n`;
+  scratchpadText.value = (scratchpadText.value ? scratchpadText.value + '\n' : '') + entry;
+  updateScratchpadCounter(scratchpadText.value);
+  if (window.dockAPI) {
+    await window.dockAPI.saveScratchpad(scratchpadText.value);
+  }
+  showToast('Dispatched to Tactical Scratchpad');
+  quickHologramModal.classList.remove('open');
+});
+
+quickActClipboard.addEventListener('click', async () => {
+  if (!currentQuickText) {
+    showToast('Buffer is empty');
+    return;
+  }
+  playJarvisSound('blip');
+  if (window.dockAPI) {
+    await window.dockAPI.copyToClipboard(currentQuickText);
+  } else {
+    await navigator.clipboard.writeText(currentQuickText);
+  }
+  showToast('Buffered to Memory & Clipboard');
+  quickHologramModal.classList.remove('open');
+});
+
+quickActYtdl.addEventListener('click', async () => {
+  if (!currentQuickText) {
+    showToast('Buffer is empty');
+    return;
+  }
+  quickHologramModal.classList.remove('open');
+  await openYtdlDrawer();
+  ytdlQueryInput.value = currentQuickText;
+  ytdlSearchForm.dispatchEvent(new Event('submit'));
+});
+
+quickActUrl.addEventListener('click', () => {
+  if (!currentQuickText) {
+    showToast('Buffer is empty');
+    return;
+  }
+  playJarvisSound('engage');
+  let target = currentQuickText;
+  if (!/^https?:\/\//i.test(target)) {
+    target = `https://www.google.com/search?q=${encodeURIComponent(target)}`;
+  }
+  if (window.dockAPI) {
+    window.dockAPI.launchTarget(target);
+  } else {
+    window.open(target, '_blank');
+  }
+  showToast('Deploying Link Protocol...');
+  quickHologramModal.classList.remove('open');
+});
+
+quickActSpeak.addEventListener('click', () => {
+  if (!currentQuickText) {
+    showToast('Buffer is empty');
+    return;
+  }
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+    const snippet = currentQuickText.slice(0, 320);
+    const utter = new SpeechSynthesisUtterance(snippet);
+    const voices = window.speechSynthesis.getVoices();
+    const jarvisVoice = voices.find((v) =>
+      v.lang.includes('en-GB') ||
+      v.name.toLowerCase().includes('george') ||
+      v.name.toLowerCase().includes('hazel') ||
+      v.name.toLowerCase().includes('david') ||
+      v.lang.includes('en-US')
+    );
+    if (jarvisVoice) utter.voice = jarvisVoice;
+    utter.rate = 1.05;
+    utter.pitch = 0.95;
+    window.speechSynthesis.speak(utter);
+    playJarvisSound('engage');
+    showToast('J.A.R.V.I.S. Vocal Readout Engaged');
+  } else {
+    showToast('Speech Synthesizer Unavailable');
   }
 });
 
