@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EdgeDock</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <aside id="rail" class="cyber-rail">
+    <!-- Header Controls -->
+    <div class="rail-header">
+      <button id="close-btn" class="action-btn" title="Hide Dock (Alt+Space)">
+        <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+      </button>
+
+      <button id="toggle-add-btn" class="action-btn" title="Add Shortcut or Drop Files">
+        <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+      </button>
+    </div>
+
+    <!-- Shortcut Stream -->
+    <main id="launcher-list" class="icon-stream"></main>
+
+    <!-- Footer Controls -->
+    <div class="rail-footer">
+      <button id="toggle-autohide-btn" class="action-btn" title="Toggle Auto-Hide">
+        <svg viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Flyout Add / Edit Drawer -->
+  <div id="drawer" class="dock-drawer">
+    <div class="drawer-title" id="drawer-title">Add Shortcut</div>
+    <form id="shortcut-form">
+      <input type="hidden" id="item-id" />
+      <div class="form-group">
+        <label for="app-name">Display Name</label>
+        <input type="text" id="app-name" class="form-input" placeholder="e.g. VS Code, Chrome, Terminal" required autocomplete="off" />
+      </div>
+
+      <div class="form-group">
+        <label for="app-path">Path or Web URL</label>
+        <div class="form-input-row">
+          <input type="text" id="app-path" class="form-input" placeholder="C:\path\to\app.exe or https://..." required autocomplete="off" />
+          <button type="button" id="browse-btn" class="browse-btn">Browse</button>
+        </div>
+      </div>
+
+      <div class="drawer-actions">
+        <button type="button" id="cancel-btn" class="btn-secondary">Cancel</button>
+        <button type="submit" id="save-btn" class="btn-primary">Save Pin</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Right-Click Context Menu -->
+  <div id="context-menu" class="context-menu">
+    <div class="context-item" id="ctx-launch">
+      <span>🚀</span> Launch
+    </div>
+    <div class="context-item" id="ctx-reveal">
+      <span>📂</span> Reveal in Folder
+    </div>
+    <div class="context-item" id="ctx-edit">
+      <span>✏️</span> Edit
+    </div>
+    <div class="context-divider"></div>
+    <div class="context-item danger" id="ctx-delete">
+      <span>🗑️</span> Remove Pin
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast-msg"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
