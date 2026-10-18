@@ -102,6 +102,8 @@ const toolYtdlBtn = document.getElementById('tool-ytdl-btn');
 const toolClipboardBtn = document.getElementById('tool-clipboard-btn');
 const toolScratchpadBtn = document.getElementById('tool-scratchpad-btn');
 const toolPodsBtn = document.getElementById('tool-pods-btn');
+const toolWindowsBtn = document.getElementById('tool-windows-btn');
+const toolCaptureBtn = document.getElementById('tool-capture-btn');
 
 // Add/Edit Drawer
 const drawer = document.getElementById('drawer');
@@ -157,6 +159,25 @@ const launchBootSwitch = document.getElementById('launch-boot-switch');
 const autohideSwitch = document.getElementById('autohide-switch');
 const closeSettingsBtn = document.getElementById('close-settings-btn');
 
+// Tactical Window Grid Manager
+const windowsDrawer = document.getElementById('windows-drawer');
+const closeWindowsBtn = document.getElementById('close-windows-btn');
+const gridCardBtns = document.querySelectorAll('.grid-card-btn');
+
+// File & Media Converter Lab
+const mediaDrawer = document.getElementById('media-drawer');
+const closeMediaBtn = document.getElementById('close-media-btn');
+const mediaDropZone = document.getElementById('media-drop-zone');
+const mediaPreviewBox = document.getElementById('media-preview-box');
+const mediaPreviewImg = document.getElementById('media-preview-img');
+const mediaFileMeta = document.getElementById('media-file-meta');
+const mediaFormatBtns = document.querySelectorAll('#media-format-segmented .segment-btn');
+const mediaConvertBtn = document.getElementById('media-convert-btn');
+const quickScreenshotBtn = document.getElementById('quick-screenshot-btn');
+
+let activeMediaConvertFormat = 'webp';
+let currentLoadedImage = null; // { file, dataUrl, width, height, size }
+
 // J.A.R.V.I.S. Holographic Drop Pods
 const hologramPodsDrawer = document.getElementById('hologram-pods-drawer');
 const closePodsBtn = document.getElementById('close-pods-btn');
@@ -172,7 +193,7 @@ const ctxEdit = document.getElementById('ctx-edit');
 const ctxDelete = document.getElementById('ctx-delete');
 const toastEl = document.getElementById('toast');
 
-const allDrawers = [drawer, settingsDrawer, ytdlDrawer, clipboardDrawer, scratchpadDrawer, hologramPodsDrawer];
+const allDrawers = [drawer, settingsDrawer, ytdlDrawer, clipboardDrawer, scratchpadDrawer, windowsDrawer, mediaDrawer, hologramPodsDrawer];
 
 // -------------------------------------------------------------
 // Mouse Event Forwarding (Permanent fix for hover glitch)
@@ -1064,7 +1085,8 @@ closeBtn.addEventListener('click', () => {
 const POD_FREQUENCIES = {
   scratchpad: 1400,
   clipboard: 1550,
-  youtube: 1700,
+  media: 1650,
+  youtube: 1750,
   weblink: 1850,
   voice: 2000
 };
@@ -1164,6 +1186,13 @@ async function executePodAction(action, payloadText = currentQuickText) {
       }
       showToast('Buffered to Memory & Clipboard');
       break;
+    }
+
+    case 'media': {
+      closeHologramPods();
+      openMediaDrawer();
+      showToast('File & Media Lab Activated');
+      return;
     }
 
     case 'youtube': {
@@ -1315,6 +1344,16 @@ dropPods.forEach((pod) => {
     e.stopPropagation();
     pod.classList.remove('drag-over');
 
+    // Check if image or file was dropped directly on pod
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      if (action === 'media' || file.type.startsWith('image/')) {
+        closeHologramPods();
+        openMediaDrawer(file);
+        return;
+      }
+    }
+
     let droppedText = '';
     if (e.dataTransfer) {
       droppedText = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text') || e.dataTransfer.getData('text/uri-list') || '';
@@ -1336,6 +1375,194 @@ closePodsBtn.addEventListener('click', closeHologramPods);
 
 toolPodsBtn.addEventListener('click', () => {
   toggleHologramPods();
+});
+
+// -------------------------------------------------------------
+// Tactical Window Grid Manager Logic
+// -------------------------------------------------------------
+function openWindowsDrawer() {
+  closeAllDrawers();
+  windowsDrawer.classList.add('open');
+  playJarvisSound('engage');
+  showToast('Tactical Window Grids Online');
+  if (window.dockAPI) window.dockAPI.setIgnoreMouse(false);
+}
+
+function closeWindowsDrawer() {
+  windowsDrawer.classList.remove('open');
+}
+
+toolWindowsBtn.addEventListener('click', () => {
+  if (windowsDrawer.classList.contains('open')) {
+    closeWindowsDrawer();
+  } else {
+    openWindowsDrawer();
+  }
+});
+
+closeWindowsBtn.addEventListener('click', closeWindowsDrawer);
+
+gridCardBtns.forEach((btn) => {
+  btn.addEventListener('click', async () => {
+    const snapAction = btn.dataset.snap;
+    playJarvisSound('engage');
+    showToast(`Engaging Grid Calibration: ${snapAction.toUpperCase()}...`);
+    closeWindowsDrawer();
+    if (window.dockAPI) {
+      await window.dockAPI.snapWindow(snapAction);
+    }
+  });
+});
+
+// -------------------------------------------------------------
+// Instant HUD Screen Capture
+// -------------------------------------------------------------
+async function triggerScreenCapture() {
+  playJarvisSound('engage');
+  showToast('Scanning Display Array...');
+  if (window.dockAPI) {
+    const res = await window.dockAPI.captureScreen();
+    if (res && res.success) {
+      playJarvisTone(1800, 0.08);
+      showToast('HUD Screen Captured & Buffered to Clipboard');
+    } else {
+      showToast(`Capture Aborted: ${res ? res.error : 'Unknown'}`);
+    }
+  }
+}
+
+toolCaptureBtn.addEventListener('click', triggerScreenCapture);
+quickScreenshotBtn.addEventListener('click', triggerScreenCapture);
+
+// -------------------------------------------------------------
+// File & Media Converter Lab Logic
+// -------------------------------------------------------------
+function openMediaDrawer(preloadedFile = null) {
+  closeAllDrawers();
+  mediaDrawer.classList.add('open');
+  playJarvisSound('engage');
+  if (window.dockAPI) window.dockAPI.setIgnoreMouse(false);
+
+  if (preloadedFile) {
+    loadMediaFile(preloadedFile);
+  }
+}
+
+function closeMediaDrawer() {
+  mediaDrawer.classList.remove('open');
+}
+
+closeMediaBtn.addEventListener('click', closeMediaDrawer);
+
+mediaFormatBtns.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    mediaFormatBtns.forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeMediaConvertFormat = btn.dataset.fmt || 'webp';
+    playJarvisSound('blip');
+  });
+});
+
+function loadMediaFile(file) {
+  if (!file || !file.type.startsWith('image/')) {
+    showToast('Invalid format: Please provide an image file');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const dataUrl = e.target.result;
+    const img = new Image();
+    img.onload = () => {
+      currentLoadedImage = {
+        name: file.name,
+        type: file.type,
+        dataUrl,
+        width: img.width,
+        height: img.height,
+        size: file.size
+      };
+      mediaPreviewImg.src = dataUrl;
+      const sizeKB = (file.size / 1024).toFixed(1);
+      mediaFileMeta.textContent = `SOURCE: ${file.name} • ${img.width}x${img.height} • ${sizeKB} KB`;
+      mediaPreviewBox.classList.remove('hidden');
+      playJarvisSound('blip');
+      showToast('Image Loaded into Media Lab');
+    };
+    img.src = dataUrl;
+  };
+  reader.readAsDataURL(file);
+}
+
+mediaDropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  mediaDropZone.classList.add('drag-active');
+});
+
+mediaDropZone.addEventListener('dragleave', () => {
+  mediaDropZone.classList.remove('drag-active');
+});
+
+mediaDropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  mediaDropZone.classList.remove('drag-active');
+  if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    loadMediaFile(e.dataTransfer.files[0]);
+  }
+});
+
+mediaDropZone.addEventListener('click', () => {
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'image/*';
+  fileInput.onchange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      loadMediaFile(e.target.files[0]);
+    }
+  };
+  fileInput.click();
+});
+
+mediaConvertBtn.addEventListener('click', async () => {
+  if (!currentLoadedImage) {
+    showToast('No active image in buffer');
+    return;
+  }
+
+  playJarvisSound('engage');
+  showToast(`Transcoding to ${activeMediaConvertFormat.toUpperCase()}...`);
+
+  const img = new Image();
+  img.onload = async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+
+    const mimeType = activeMediaConvertFormat === 'jpeg' ? 'image/jpeg' : `image/${activeMediaConvertFormat}`;
+    const quality = activeMediaConvertFormat === 'png' ? 1.0 : 0.88;
+    const dataUrl = canvas.toDataURL(mimeType, quality);
+    const base64Data = dataUrl.split(',')[1];
+
+    const baseName = currentLoadedImage.name.replace(/\.[^/.]+$/, '');
+    const outFilename = `${baseName}_${activeMediaConvertFormat}.${activeMediaConvertFormat === 'jpeg' ? 'jpg' : activeMediaConvertFormat}`;
+
+    if (window.dockAPI) {
+      const res = await window.dockAPI.saveConvertedImage({
+        base64Data,
+        format: activeMediaConvertFormat === 'jpeg' ? 'jpg' : activeMediaConvertFormat,
+        filename: outFilename
+      });
+      if (res && res.success) {
+        playJarvisTone(1900, 0.08);
+        showToast(`Saved & Buffered: ${outFilename}`);
+        closeMediaDrawer();
+      } else {
+        showToast(`Transcode failed: ${res ? res.error : 'Unknown'}`);
+      }
+    }
+  };
+  img.src = currentLoadedImage.dataUrl;
 });
 
 // Accelerator Matcher Helper

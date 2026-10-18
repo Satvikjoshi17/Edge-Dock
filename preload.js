@@ -39,6 +39,15 @@ contextBridge.exposeInMainWorld('dockAPI', {
   onDownloadComplete: (callback) => ipcRenderer.on('download-complete', (event, data) => callback(data)),
   onSetupProgress: (callback) => ipcRenderer.on('setup-progress', (event, data) => callback(data)),
 
+  // Tactical Window Manager
+  snapWindow: (action) => ipcRenderer.invoke('snap-window', action),
+
+  // Instant HUD Screen Capture
+  captureScreen: () => ipcRenderer.invoke('capture-screen'),
+
+  // Media & Image Lab
+  saveConvertedImage: (params) => ipcRenderer.invoke('save-converted-image', params),
+
   // J.A.R.V.I.S. Quick-Action Hologram Trigger
   onSummonQuickAction: (callback) => ipcRenderer.on('summon-quick-action', (event, text) => callback(text))
 });

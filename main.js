@@ -1,4 +1,4 @@
-const { app, BrowserWindow, screen, ipcMain, shell, globalShortcut, Tray, Menu, nativeImage, dialog, clipboard } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, shell, globalShortcut, Tray, Menu, nativeImage, dialog, clipboard, desktopCapturer } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
@@ -787,6 +787,78 @@ ipcMain.handle('open-downloads-folder', async () => {
   const dir = app.getPath('downloads');
   await shell.openPath(dir);
   return true;
+});
+
+// Tactical Window Grid Manager
+ipcMain.handle('snap-window', async (event, action) => {
+  try {
+    const scriptPath = path.join(__dirname, 'scripts', 'snap-window.ps1');
+    return new Promise((resolve) => {
+      const child = spawn('powershell', ['-ExecutionPolicy', 'Bypass', '-File', scriptPath, '-action', action], {
+        windowsHide: true
+      });
+      child.on('close', (code) => {
+        resolve({ success: code === 0 });
+      });
+      child.on('error', () => {
+        resolve({ success: false });
+      });
+    });
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// Instant HUD Screen Capture
+ipcMain.handle('capture-screen', async () => {
+  try {
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width, height } = primaryDisplay.size;
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: { width, height }
+    });
+    if (!sources || sources.length === 0) {
+      return { success: false, error: 'No display source detected' };
+    }
+    const img = sources[0].thumbnail;
+    clipboard.writeImage(img);
+
+    const picturesDir = app.getPath('pictures');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const outPath = path.join(picturesDir, `J.A.R.V.I.S._Capture_${timestamp}.png`);
+    fs.writeFileSync(outPath, img.toPNG());
+
+    return {
+      success: true,
+      filePath: outPath,
+      dataUrl: img.toDataURL()
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// File & Media Converter / Storage
+ipcMain.handle('save-converted-image', async (event, { base64Data, format, filename }) => {
+  try {
+    const picturesDir = app.getPath('pictures');
+    const safeName = filename || `J.A.R.V.I.S._Converted_${Date.now()}.${format || 'png'}`;
+    const targetPath = path.join(picturesDir, safeName);
+    const buffer = Buffer.from(base64Data, 'base64');
+    fs.writeFileSync(targetPath, buffer);
+
+    try {
+      const nativeImg = nativeImage.createFromBuffer(buffer);
+      if (!nativeImg.isEmpty()) {
+        clipboard.writeImage(nativeImg);
+      }
+    } catch {}
+
+    return { success: true, filePath: targetPath };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
 });
 
 app.on('will-quit', () => {
