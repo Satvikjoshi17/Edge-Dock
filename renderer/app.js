@@ -1401,38 +1401,72 @@ async function executeSectorAction(sectorId, payloadText = currentQuickText) {
   closeRadialDonutModal();
 }
 
-// Global Drag & Drop Listeners
+// Global Drag & Drop + Hold-Key Logic
+// Hologram appears while holding the key (Shift) during drag, disappears when unheld, and works in between
+let isDragging = false;
+let isShiftHolding = false;
+let isMouseHolding = false;
+
+window.addEventListener('dragstart', (e) => {
+  isDragging = true;
+  currentQuickText = window.getSelection().toString() || '';
+});
+
+window.addEventListener('dragend', () => {
+  isDragging = false;
+  closeRadialDonutModal();
+});
+
 window.addEventListener('dragenter', (e) => {
   e.preventDefault();
-  if (!radialDonutModal.classList.contains('open')) {
-    openRadialDonutModal(window.getSelection().toString() || '');
-  }
+  isDragging = true;
 });
 
 window.addEventListener('dragover', (e) => {
   e.preventDefault();
+  isDragging = true;
   if (e.dataTransfer) {
     e.dataTransfer.dropEffect = 'copy';
   }
-  if (radialDonutModal.classList.contains('open')) {
+
+  // Key condition: Hologram appears while holding Shift during drag, disappears when unheld
+  const isHoldingKey = e.shiftKey;
+
+  if (isHoldingKey) {
+    if (!radialDonutModal.classList.contains('open')) {
+      openRadialDonutModal(currentQuickText || window.getSelection().toString() || '');
+      donutCenterInstruction.textContent = 'HOLDING SHIFT // AIM AT SECTOR';
+      donutFootText.textContent = 'HOLD [SHIFT] ACTIVE // DROP OVER SECTOR TO ENGAGE';
+    }
+
+    // Works in between: hover each option smoothly
     const result = getSectorFromCoordinates(e.clientX, e.clientY);
     if (result.zone === 'sector') {
       setActiveSector(result.sector);
     } else {
       setActiveSector(null);
     }
+  } else {
+    // Disappears while unheld!
+    if (radialDonutModal.classList.contains('open')) {
+      closeRadialDonutModal();
+    }
   }
 });
 
 window.addEventListener('dragleave', (e) => {
   if (!e.relatedTarget && (e.clientX <= 0 || e.clientY <= 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight)) {
+    isDragging = false;
     closeRadialDonutModal();
   }
 });
 
 window.addEventListener('drop', (e) => {
   e.preventDefault();
-  if (radialDonutModal.classList.contains('open')) {
+  const wasOpen = radialDonutModal.classList.contains('open');
+  isDragging = false;
+
+  if (wasOpen) {
     let droppedText = '';
     if (e.dataTransfer) {
       droppedText = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text') || '';
@@ -1450,10 +1484,7 @@ window.addEventListener('drop', (e) => {
   }
 });
 
-// Pointer, Mouse-Hold, and Click events on Donut Wheel
-let isShiftHolding = false;
-let isMouseHolding = false;
-
+// Pointer & Click events on Donut Wheel (when opened via tool button or hotkey)
 donutWheelWrapper.addEventListener('mousemove', (e) => {
   const result = getSectorFromCoordinates(e.clientX, e.clientY);
   if (result.zone === 'sector') {
@@ -1489,20 +1520,17 @@ donutWheelWrapper.addEventListener('click', (e) => {
   }
 });
 
-// Hold Shift key to keep hologram open, release to execute!
-window.addEventListener('keydown', async (e) => {
-  const isTyping = ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
-  if (e.key === 'Shift' && !e.repeat && !isTyping) {
+// Key shortcut: ONLY works while dragging something!
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Shift' && !e.repeat) {
+    // Only works if dragging something
+    if (!isDragging) return;
+
     isShiftHolding = true;
     if (!radialDonutModal.classList.contains('open')) {
-      let text = window.getSelection().toString() || '';
-      if (!text && window.dockAPI) {
-        const history = await window.dockAPI.getClipboardHistory();
-        if (history && history.length > 0) text = history[0];
-      }
-      openRadialDonutModal(text);
+      openRadialDonutModal(currentQuickText || window.getSelection().toString() || '');
       donutCenterInstruction.textContent = 'HOLDING SHIFT // AIM AT SECTOR';
-      donutFootText.textContent = 'HOLD [SHIFT] ACTIVE // RELEASE KEY OVER SECTOR TO FIRE';
+      donutFootText.textContent = 'HOLD [SHIFT] ACTIVE // RELEASE OVER SECTOR TO FIRE';
     }
   }
 
@@ -1514,8 +1542,8 @@ window.addEventListener('keydown', async (e) => {
 
 window.addEventListener('keyup', (e) => {
   if (e.key === 'Shift') {
-    if (isShiftHolding && radialDonutModal.classList.contains('open')) {
-      isShiftHolding = false;
+    // Unholding the key causes the hologram to disappear or fire if hovering an option!
+    if (radialDonutModal.classList.contains('open')) {
       if (activeHoveredSectorId) {
         executeSectorAction(activeHoveredSectorId, currentQuickText);
       } else {
