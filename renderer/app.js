@@ -6,13 +6,56 @@ const SVG_ICONS = {
   default: `<svg viewBox="0 0 24 24"><path d="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z"/></svg>`
 };
 
+// -------------------------------------------------------------
+// J.A.R.V.I.S. Audio Synthesizer (Zero-latency Web Audio SFX)
+// -------------------------------------------------------------
+let audioCtx = null;
+function getAudioContext() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return audioCtx;
+}
+
+function playJarvisSound(type = 'blip') {
+  try {
+    const ctx = getAudioContext();
+    if (ctx.state === 'suspended') ctx.resume();
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    const now = ctx.currentTime;
+    if (type === 'blip') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1400, now);
+      osc.frequency.exponentialRampToValueAtTime(1800, now + 0.04);
+      gain.gain.setValueAtTime(0.04, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+      osc.start(now);
+      osc.stop(now + 0.04);
+    } else if (type === 'engage') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(800, now);
+      osc.frequency.exponentialRampToValueAtTime(2200, now + 0.08);
+      gain.gain.setValueAtTime(0.06, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+      osc.start(now);
+      osc.stop(now + 0.08);
+    }
+  } catch {}
+}
+
 let shortcuts = [];
 let currentSettings = {
   dockPosition: 'right',
   autoHide: false,
   hotkey: 'Alt+Space',
   launchOnBoot: true,
-  accentColor: '#00f2fe'
+  accentColor: '#00f0ff',
+  showLabels: true
 };
 
 let activeContextMenuTarget = null;
@@ -21,6 +64,7 @@ let temporaryPickedIcon = null;
 let selectedDownloadFormat = 'mp4';
 let clipboardCache = [];
 let scratchpadSaveTimeout = null;
+let isCapturingMouse = true;
 
 // DOM Elements
 const bodyEl = document.getElementById('dock-body');
@@ -53,15 +97,16 @@ const ytdlSetupBox = document.getElementById('ytdl-setup-box');
 const installEngineBtn = document.getElementById('install-engine-btn');
 const setupProgressBar = document.getElementById('setup-progress-bar');
 const setupProgressFill = document.getElementById('setup-progress-fill');
-const ytdlForm = document.getElementById('ytdl-form');
-const ytdlUrlInput = document.getElementById('ytdl-url-input');
+const ytdlSearchForm = document.getElementById('ytdl-search-form');
+const ytdlQueryInput = document.getElementById('ytdl-query-input');
+const searchMediaBtn = document.getElementById('search-media-btn');
+const ytdlResultsList = document.getElementById('ytdl-results-list');
 const ytdlFormatBtns = ytdlDrawer.querySelectorAll('.segmented-control .segment-btn');
 const downloadProgressBox = document.getElementById('download-progress-box');
 const downloadStatusText = document.getElementById('download-status-text');
 const downloadProgressFill = document.getElementById('download-progress-fill');
 const downloadMetaText = document.getElementById('download-meta-text');
 const openDownloadsBtn = document.getElementById('open-downloads-btn');
-const startDownloadBtn = document.getElementById('start-download-btn');
 
 // Clipboard Drawer
 const clipboardDrawer = document.getElementById('clipboard-drawer');
@@ -83,6 +128,7 @@ const segmentBtns = document.querySelectorAll('#position-segmented .segment-btn'
 const colorDots = document.querySelectorAll('.color-dot');
 const hotkeyInput = document.getElementById('hotkey-input');
 const saveHotkeyBtn = document.getElementById('save-hotkey-btn');
+const showLabelsSwitch = document.getElementById('show-labels-switch');
 const launchBootSwitch = document.getElementById('launch-boot-switch');
 const autohideSwitch = document.getElementById('autohide-switch');
 const closeSettingsBtn = document.getElementById('close-settings-btn');
@@ -97,13 +143,30 @@ const toastEl = document.getElementById('toast');
 
 const allDrawers = [drawer, settingsDrawer, ytdlDrawer, clipboardDrawer, scratchpadDrawer];
 
+// -------------------------------------------------------------
+// Mouse Event Forwarding (Permanent fix for hover glitch)
+// -------------------------------------------------------------
+window.addEventListener('mousemove', (e) => {
+  const overRail = rail.contains(e.target);
+  const overDrawer = allDrawers.some((d) => d.classList.contains('open') && d.contains(e.target));
+  const overCtx = contextMenu.classList.contains('visible') && contextMenu.contains(e.target);
+
+  const shouldCapture = overRail || overDrawer || overCtx;
+  if (shouldCapture !== isCapturingMouse) {
+    isCapturingMouse = shouldCapture;
+    if (window.dockAPI) {
+      window.dockAPI.setIgnoreMouse(!shouldCapture);
+    }
+  }
+});
+
 async function init() {
   if (window.dockAPI) {
     shortcuts = (await window.dockAPI.getShortcuts()) || [];
     const savedSettings = await window.dockAPI.getSettings();
     if (savedSettings) currentSettings = { ...currentSettings, ...savedSettings };
 
-    // Register Power Tool Listeners
+    // Power Tool Listeners
     window.dockAPI.onClipboardUpdated((clips) => {
       clipboardCache = clips || [];
       renderClipboardList();
@@ -111,28 +174,27 @@ async function init() {
 
     window.dockAPI.onDownloadProgress((prog) => {
       downloadProgressBox.classList.remove('hidden');
-      downloadStatusText.textContent = `Downloading... ${prog.percent}%`;
+      downloadStatusText.textContent = `DOWNLOADING STREAM... ${prog.percent}%`;
       downloadProgressFill.style.width = `${prog.percent}%`;
       downloadMetaText.textContent = `${prog.percent}% • ${prog.speed || '--'} • ETA ${prog.eta || '--'}`;
     });
 
     window.dockAPI.onDownloadComplete((res) => {
-      startDownloadBtn.disabled = false;
-      startDownloadBtn.textContent = 'Download';
       if (res && res.success) {
-        downloadStatusText.textContent = 'Download Complete!';
+        downloadStatusText.textContent = 'PROTOCOL COMPLETE';
         downloadProgressFill.style.width = '100%';
-        showToast('Download finished! Saved to Downloads folder');
+        playJarvisSound('engage');
+        showToast('Stream acquisition complete! Saved to Downloads');
       } else {
-        downloadStatusText.textContent = 'Download Failed';
-        showToast(`Download failed: ${res.error || 'Check URL'}`);
+        downloadStatusText.textContent = 'PROTOCOL FAILED';
+        showToast(`Download aborted: ${res.error || 'Check stream source'}`);
       }
     });
 
     window.dockAPI.onSetupProgress((data) => {
       setupProgressBar.classList.remove('hidden');
       setupProgressFill.style.width = `${data.percent}%`;
-      installEngineBtn.textContent = `Setting up engine... ${data.percent}%`;
+      installEngineBtn.textContent = `SYNCHRONIZING CORE... ${data.percent}%`;
     });
   }
 
@@ -155,10 +217,11 @@ function applySettings(settings) {
     document.documentElement.style.setProperty('--accent', settings.accentColor);
     const hex = settings.accentColor.replace('#', '');
     const r = parseInt(hex.substring(0, 2), 16) || 0;
-    const g = parseInt(hex.substring(2, 4), 16) || 242;
-    const b = parseInt(hex.substring(4, 6), 16) || 254;
-    document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.4)`);
-    document.documentElement.style.setProperty('--border-color', `rgba(${r}, ${g}, ${b}, 0.22)`);
+    const g = parseInt(hex.substring(2, 4), 16) || 240;
+    const b = parseInt(hex.substring(4, 6), 16) || 255;
+    document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.45)`);
+    document.documentElement.style.setProperty('--accent-dim', `rgba(${r}, ${g}, ${b}, 0.15)`);
+    document.documentElement.style.setProperty('--border-hud', `rgba(${r}, ${g}, ${b}, 0.28)`);
 
     colorDots.forEach((dot) => {
       dot.classList.toggle('active', dot.dataset.color.toLowerCase() === settings.accentColor.toLowerCase());
@@ -179,13 +242,13 @@ function applySettings(settings) {
   if (settings.autoHide) {
     bodyEl.classList.add('autohide-active');
     toggleAutoHideBtn.classList.add('active');
-    toggleAutoHideBtn.title = 'Auto-Hide: Enabled (Click to Pin)';
+    toggleAutoHideBtn.title = 'Cloak: Active (Click to Disengage)';
     autohideSwitch.checked = true;
   } else {
     bodyEl.classList.remove('autohide-active');
     rail.classList.remove('peek-hidden');
     toggleAutoHideBtn.classList.remove('active');
-    toggleAutoHideBtn.title = 'Auto-Hide: Disabled (Click to Enable)';
+    toggleAutoHideBtn.title = 'Cloak: Off (Click to Engage)';
     autohideSwitch.checked = false;
   }
 
@@ -194,33 +257,23 @@ function applySettings(settings) {
     hotkeyInput.value = settings.hotkey;
   }
 
-  // 5. Startup Launch
+  // 5. Show Labels
+  showLabelsSwitch.checked = settings.showLabels !== false;
+
+  // 6. Startup Launch
   launchBootSwitch.checked = Boolean(settings.launchOnBoot);
-}
-
-// Window expansion management
-function checkWindowExpansion() {
-  const isAnyDrawerOpen = allDrawers.some((d) => d.classList.contains('open'));
-  const isContextMenuOpen = contextMenu.classList.contains('visible');
-  const isHovered = rail.matches(':hover');
-
-  const shouldExpand = isAnyDrawerOpen || isContextMenuOpen || isHovered;
-  if (window.dockAPI) {
-    window.dockAPI.setExpanded(shouldExpand);
-  }
 }
 
 function closeAllDrawers() {
   allDrawers.forEach((d) => d.classList.remove('open'));
   temporaryPickedIcon = null;
-  checkWindowExpansion();
 }
 
 rail.addEventListener('mouseenter', () => {
   if (currentSettings.autoHide) {
     rail.classList.remove('peek-hidden');
   }
-  checkWindowExpansion();
+  playJarvisSound('blip');
 });
 
 rail.addEventListener('mouseleave', () => {
@@ -228,7 +281,6 @@ rail.addEventListener('mouseleave', () => {
   if (currentSettings.autoHide && !isAnyDrawerOpen) {
     rail.classList.add('peek-hidden');
   }
-  checkWindowExpansion();
 });
 
 // Pre-fetch native icons
@@ -249,6 +301,19 @@ async function loadMissingIcons() {
   if (changed) {
     await window.dockAPI.saveShortcuts(shortcuts);
   }
+}
+
+// Compute smart monogram tag for visual distinction (e.g. CMD vs TERM)
+function getShortcutTag(item) {
+  if (item.tag) return item.tag;
+  const p = item.path.toLowerCase();
+  const n = item.name.toLowerCase();
+  if (p === 'cmd' || n.includes('cmd') || p.includes('cmd.exe')) return 'CMD';
+  if (p === 'wt' || n.includes('terminal') || p.includes('powershell')) return 'TERM';
+  if (p.includes('code') || n.includes('code')) return 'CODE';
+  if (p.startsWith('http')) return 'WEB';
+  if (p.includes('/') || p.includes('\\')) return 'DIR';
+  return (item.name.substring(0, 3)).toUpperCase();
 }
 
 function getIconElement(item) {
@@ -292,6 +357,7 @@ function createSvgElement(svgHtml) {
   return wrapper.firstChild;
 }
 
+// Render Launcher List with Distinct Labels & Tags
 function renderShortcuts() {
   listContainer.innerHTML = '';
 
@@ -302,23 +368,46 @@ function renderShortcuts() {
     tile.setAttribute('draggable', 'true');
     tile.dataset.index = index;
 
-    const iconEl = getIconElement(item);
-    tile.appendChild(iconEl);
+    // Tag (e.g. CMD vs TERM)
+    const tag = getShortcutTag(item);
+    const tagEl = document.createElement('span');
+    tagEl.className = 'tile-tag';
+    tagEl.textContent = tag;
+    tile.appendChild(tagEl);
 
+    // Icon Container
+    const iconWrapper = document.createElement('div');
+    iconWrapper.className = 'cyber-tile-icon';
+    iconWrapper.appendChild(getIconElement(item));
+    tile.appendChild(iconWrapper);
+
+    // Name Label Underneath
+    if (currentSettings.showLabels !== false) {
+      const label = document.createElement('span');
+      label.className = 'tile-label';
+      label.textContent = item.name;
+      tile.appendChild(label);
+    }
+
+    // Launch shortcut
     tile.addEventListener('click', async () => {
+      playJarvisSound('engage');
       if (window.dockAPI) {
         const result = await window.dockAPI.launchTarget(item.path);
         if (result && !result.success) {
-          showToast(`Launch failed: ${result.error || 'Not found'}`);
+          showToast(`Protocol Failed: ${result.error || 'Executable offline'}`);
         }
       }
     });
 
+    // Right-click context menu
     tile.addEventListener('contextmenu', (e) => {
       e.preventDefault();
+      playJarvisSound('blip');
       showContextMenu(e.clientX, e.clientY, item);
     });
 
+    // Drag-to-reorder handlers
     tile.addEventListener('dragstart', (e) => {
       draggedItemIndex = index;
       tile.classList.add('dragging');
@@ -358,9 +447,7 @@ function renderShortcuts() {
 
       if (draggedItemIndex !== null && draggedItemIndex !== undefined) {
         const movedItem = shortcuts.splice(draggedItemIndex, 1)[0];
-        if (draggedItemIndex < targetIndex) {
-          targetIndex--;
-        }
+        if (draggedItemIndex < targetIndex) targetIndex--;
         shortcuts.splice(targetIndex, 0, movedItem);
         draggedItemIndex = null;
         clearDropIndicators();
@@ -422,7 +509,8 @@ rail.addEventListener('drop', async (e) => {
       await window.dockAPI.saveShortcuts(shortcuts);
     }
     renderShortcuts();
-    showToast('Shortcut pinned');
+    playJarvisSound('engage');
+    showToast('New Protocol Pinned to HUD');
   }
 });
 
@@ -431,14 +519,13 @@ function showContextMenu(x, y, item) {
   activeContextMenuTarget = item;
   contextMenu.style.top = `${Math.min(y, window.innerHeight - 150)}px`;
   if (currentSettings.dockPosition === 'left') {
-    contextMenu.style.left = '76px';
+    contextMenu.style.left = '84px';
     contextMenu.style.right = 'auto';
   } else {
-    contextMenu.style.right = '76px';
+    contextMenu.style.right = '84px';
     contextMenu.style.left = 'auto';
   }
   contextMenu.classList.add('visible');
-  checkWindowExpansion();
 
   if (item.path.startsWith('http')) {
     ctxReveal.style.display = 'none';
@@ -450,7 +537,6 @@ function showContextMenu(x, y, item) {
 function hideContextMenu() {
   contextMenu.classList.remove('visible');
   activeContextMenuTarget = null;
-  checkWindowExpansion();
 }
 
 document.addEventListener('click', (e) => {
@@ -466,9 +552,10 @@ document.addEventListener('click', (e) => {
 
 ctxLaunch.addEventListener('click', async () => {
   if (activeContextMenuTarget && window.dockAPI) {
+    playJarvisSound('engage');
     const res = await window.dockAPI.launchTarget(activeContextMenuTarget.path);
     if (res && !res.success) {
-      showToast(`Launch failed: ${res.error || 'Unknown error'}`);
+      showToast(`Protocol Failed: ${res.error || 'Execution fault'}`);
     }
   }
   hideContextMenu();
@@ -476,6 +563,7 @@ ctxLaunch.addEventListener('click', async () => {
 
 ctxReveal.addEventListener('click', async () => {
   if (activeContextMenuTarget && window.dockAPI) {
+    playJarvisSound('blip');
     await window.dockAPI.showInFolder(activeContextMenuTarget.path);
   }
   hideContextMenu();
@@ -495,7 +583,8 @@ ctxDelete.addEventListener('click', async () => {
       await window.dockAPI.saveShortcuts(shortcuts);
     }
     renderShortcuts();
-    showToast('Shortcut removed');
+    playJarvisSound('engage');
+    showToast('Protocol Purged from HUD');
   }
   hideContextMenu();
 });
@@ -503,21 +592,21 @@ ctxDelete.addEventListener('click', async () => {
 // Add/Edit Drawer
 function openAddDrawer(itemToEdit = null) {
   closeAllDrawers();
+  playJarvisSound('blip');
   if (itemToEdit) {
-    drawerTitle.textContent = 'Edit Shortcut';
+    drawerTitle.innerHTML = '<span>// RECALIBRATE PROTOCOL</span>';
     itemIdInput.value = itemToEdit.id;
     appNameInput.value = itemToEdit.name;
     appPathInput.value = itemToEdit.path;
     temporaryPickedIcon = itemToEdit.iconData || null;
   } else {
-    drawerTitle.textContent = 'Add Shortcut';
+    drawerTitle.innerHTML = '<span>// ENGAGE NEW PROTOCOL</span>';
     itemIdInput.value = '';
     appNameInput.value = '';
     appPathInput.value = '';
     temporaryPickedIcon = null;
   }
   drawer.classList.add('open');
-  checkWindowExpansion();
   appNameInput.focus();
 }
 
@@ -533,6 +622,7 @@ cancelBtn.addEventListener('click', closeAllDrawers);
 
 browseBtn.addEventListener('click', async () => {
   if (window.dockAPI) {
+    playJarvisSound('blip');
     const selected = await window.dockAPI.selectFile();
     if (selected) {
       appPathInput.value = selected.path;
@@ -564,7 +654,7 @@ shortcutForm.addEventListener('submit', async (e) => {
       existing.path = path;
       if (iconData) existing.iconData = iconData;
     }
-    showToast('Shortcut updated');
+    showToast('Protocol Recalibrated');
   } else {
     shortcuts.push({
       id: Date.now().toString(),
@@ -572,38 +662,39 @@ shortcutForm.addEventListener('submit', async (e) => {
       path,
       iconData
     });
-    showToast('Shortcut added');
+    showToast('Protocol Engaged');
   }
 
   if (window.dockAPI) {
     await window.dockAPI.saveShortcuts(shortcuts);
   }
 
+  playJarvisSound('engage');
   renderShortcuts();
   closeAllDrawers();
 });
 
 // -------------------------------------------------------------
-// Power Tool 1: YouTube / Media Downloader
+// Power Tool 1: YouTube Downloader & Video Search
 // -------------------------------------------------------------
 async function openYtdlDrawer() {
   closeAllDrawers();
+  playJarvisSound('blip');
   ytdlDrawer.classList.add('open');
-  checkWindowExpansion();
 
   if (window.dockAPI) {
     const status = await window.dockAPI.checkYtdlStatus();
     if (status && status.installed) {
-      ytdlEngineBadge.textContent = 'Engine Ready';
+      ytdlEngineBadge.textContent = 'CORE READY';
       ytdlEngineBadge.className = 'engine-badge ready';
       ytdlSetupBox.classList.add('hidden');
     } else {
-      ytdlEngineBadge.textContent = 'Setup Required';
+      ytdlEngineBadge.textContent = 'CORE OFFLINE';
       ytdlEngineBadge.className = 'engine-badge missing';
       ytdlSetupBox.classList.remove('hidden');
     }
   }
-  ytdlUrlInput.focus();
+  ytdlQueryInput.focus();
 }
 
 toolYtdlBtn.addEventListener('click', () => {
@@ -617,41 +708,89 @@ toolYtdlBtn.addEventListener('click', () => {
 installEngineBtn.addEventListener('click', async () => {
   if (!window.dockAPI) return;
   installEngineBtn.disabled = true;
-  installEngineBtn.textContent = 'Downloading yt-dlp.exe...';
+  installEngineBtn.textContent = 'DOWNLOADING YT-DLP CORE...';
   setupProgressBar.classList.remove('hidden');
 
   const res = await window.dockAPI.installYtdl();
   if (res && res.success) {
-    ytdlEngineBadge.textContent = 'Engine Ready';
+    ytdlEngineBadge.textContent = 'CORE READY';
     ytdlEngineBadge.className = 'engine-badge ready';
     ytdlSetupBox.classList.add('hidden');
-    showToast('Media engine installed successfully!');
+    playJarvisSound('engage');
+    showToast('J.A.R.V.I.S. Media Core online!');
   } else {
     installEngineBtn.disabled = false;
-    installEngineBtn.textContent = 'Retry Setup';
+    installEngineBtn.textContent = 'RETRY CORE SETUP';
     showToast(`Setup failed: ${res.error || 'Network error'}`);
   }
 });
 
 ytdlFormatBtns.forEach((btn) => {
   btn.addEventListener('click', () => {
+    playJarvisSound('blip');
     ytdlFormatBtns.forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
     selectedDownloadFormat = btn.dataset.format;
   });
 });
 
-ytdlForm.addEventListener('submit', async (e) => {
+// Search & Preview YouTube Videos
+ytdlSearchForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const url = ytdlUrlInput.value.trim();
-  if (!url || !window.dockAPI) return;
+  const query = ytdlQueryInput.value.trim();
+  if (!query || !window.dockAPI) return;
 
-  startDownloadBtn.disabled = true;
-  startDownloadBtn.textContent = 'Starting...';
+  searchMediaBtn.disabled = true;
+  searchMediaBtn.textContent = 'SCANNING...';
+  ytdlResultsList.innerHTML = `<div class="search-placeholder">Scanning frequency for "${escapeHtml(query)}"...</div>`;
+
+  playJarvisSound('blip');
+  const results = await window.dockAPI.searchYouTube(query);
+  searchMediaBtn.disabled = false;
+  searchMediaBtn.textContent = 'SCAN';
+
+  renderSearchResults(results);
+});
+
+function renderSearchResults(results) {
+  ytdlResultsList.innerHTML = '';
+  if (!results || results.length === 0) {
+    ytdlResultsList.innerHTML = '<div class="search-placeholder">No video streams identified. Verify connection or query.</div>';
+    return;
+  }
+
+  results.forEach((video) => {
+    const card = document.createElement('div');
+    card.className = 'video-card';
+    card.innerHTML = `
+      <div class="video-thumb-wrapper">
+        <img src="${video.thumbnail || 'https://via.placeholder.com/120x68?text=JARVIS'}" alt="${escapeHtml(video.title)}" />
+        ${video.duration ? `<span class="video-duration-badge">${video.duration}</span>` : ''}
+      </div>
+      <div class="video-info">
+        <div class="video-title" title="${escapeHtml(video.title)}">${escapeHtml(video.title)}</div>
+        <div class="video-channel">${escapeHtml(video.channel)}</div>
+      </div>
+      <div class="video-download-icon" title="Extract Stream">⚡</div>
+    `;
+
+    card.addEventListener('click', () => {
+      triggerDownload(video.url, video.title);
+    });
+
+    ytdlResultsList.appendChild(card);
+  });
+}
+
+async function triggerDownload(url, title) {
+  if (!window.dockAPI) return;
+
+  playJarvisSound('engage');
   downloadProgressBox.classList.remove('hidden');
-  downloadStatusText.textContent = 'Connecting to stream...';
+  downloadStatusText.textContent = `ACQUIRING: ${title.substring(0, 28)}...`;
   downloadProgressFill.style.width = '0%';
-  downloadMetaText.textContent = 'Initializing stream analyzer...';
+  downloadMetaText.textContent = 'Engaging media pipeline...';
+  showToast(`Initiating ${selectedDownloadFormat.toUpperCase()} download...`);
 
   const res = await window.dockAPI.startMediaDownload({
     url,
@@ -659,26 +798,25 @@ ytdlForm.addEventListener('submit', async (e) => {
   });
 
   if (res && !res.success) {
-    startDownloadBtn.disabled = false;
-    startDownloadBtn.textContent = 'Download';
-    downloadStatusText.textContent = 'Failed to start';
-    showToast(res.error || 'Download start error');
+    downloadStatusText.textContent = 'TRANSMISSION FAULT';
+    showToast(res.error || 'Failed to initialize download stream');
   }
-});
+}
 
 openDownloadsBtn.addEventListener('click', () => {
   if (window.dockAPI) {
+    playJarvisSound('blip');
     window.dockAPI.openDownloadsFolder();
   }
 });
 
 // -------------------------------------------------------------
-// Power Tool 2: Clipboard History
+// Power Tool 2: Clipboard History (Data Buffer)
 // -------------------------------------------------------------
 async function openClipboardDrawer() {
   closeAllDrawers();
+  playJarvisSound('blip');
   clipboardDrawer.classList.add('open');
-  checkWindowExpansion();
 
   if (window.dockAPI) {
     clipboardCache = (await window.dockAPI.getClipboardHistory()) || [];
@@ -704,10 +842,10 @@ function renderClipboardList() {
   if (filtered.length === 0) {
     const empty = document.createElement('div');
     empty.style.color = 'var(--text-dim)';
-    empty.style.fontSize = '10px';
+    empty.style.fontSize = '9.5px';
     empty.style.textAlign = 'center';
-    empty.style.padding = '20px 0';
-    empty.textContent = filter ? 'No matching clips found' : 'Clipboard history is empty';
+    empty.style.padding = '24px 0';
+    empty.textContent = filter ? 'No matching data buffers found' : 'Data buffer is currently cleared';
     clipboardList.appendChild(empty);
     return;
   }
@@ -718,15 +856,16 @@ function renderClipboardList() {
     card.innerHTML = `
       <div class="clip-card-header">
         <span class="clip-time">${item.time}</span>
-        <span class="clip-copy-tag">Click to Copy</span>
+        <span class="clip-copy-tag">LOAD TO BUFFER</span>
       </div>
       <div class="clip-text">${escapeHtml(item.text)}</div>
     `;
 
     card.addEventListener('click', async () => {
       if (window.dockAPI) {
+        playJarvisSound('engage');
         await window.dockAPI.copyToClipboard(item.text);
-        showToast('Copied to clipboard!');
+        showToast('Data Loaded to Active Clipboard');
       }
     });
 
@@ -744,20 +883,21 @@ clipboardSearch.addEventListener('input', renderClipboardList);
 
 clearClipboardBtn.addEventListener('click', async () => {
   if (window.dockAPI) {
+    playJarvisSound('engage');
     await window.dockAPI.clearClipboardHistory();
     clipboardCache = [];
     renderClipboardList();
-    showToast('Clipboard history cleared');
+    showToast('Data Buffer Purged');
   }
 });
 
 // -------------------------------------------------------------
-// Power Tool 3: Quick Scratchpad
+// Power Tool 3: Quick Scratchpad (Tactical Memory)
 // -------------------------------------------------------------
 async function openScratchpadDrawer() {
   closeAllDrawers();
+  playJarvisSound('blip');
   scratchpadDrawer.classList.add('open');
-  checkWindowExpansion();
 
   if (window.dockAPI) {
     const text = (await window.dockAPI.getScratchpad()) || '';
@@ -778,19 +918,19 @@ toolScratchpadBtn.addEventListener('click', () => {
 function updateScratchpadCounter(text) {
   const chars = text.length;
   const words = text.trim() ? text.trim().split(/\s+/).length : 0;
-  scratchpadCounter.textContent = `${chars} chars • ${words} words`;
+  scratchpadCounter.textContent = `${chars} BYTES // ${words} TOKENS`;
 }
 
 scratchpadText.addEventListener('input', () => {
   const text = scratchpadText.value;
   updateScratchpadCounter(text);
-  scratchpadSavedBadge.textContent = 'Saving...';
+  scratchpadSavedBadge.textContent = 'SYNCING...';
 
   clearTimeout(scratchpadSaveTimeout);
   scratchpadSaveTimeout = setTimeout(async () => {
     if (window.dockAPI) {
       await window.dockAPI.saveScratchpad(text);
-      scratchpadSavedBadge.textContent = 'Saved';
+      scratchpadSavedBadge.textContent = 'SYNCED';
     }
   }, 400);
 });
@@ -798,8 +938,9 @@ scratchpadText.addEventListener('input', () => {
 copyScratchpadBtn.addEventListener('click', async () => {
   const text = scratchpadText.value;
   if (text && window.dockAPI) {
+    playJarvisSound('engage');
     await window.dockAPI.copyToClipboard(text);
-    showToast('Scratchpad copied to clipboard!');
+    showToast('Scratchpad Extracted to Clipboard');
   }
 });
 
@@ -807,18 +948,19 @@ clearScratchpadBtn.addEventListener('click', async () => {
   scratchpadText.value = '';
   updateScratchpadCounter('');
   if (window.dockAPI) {
+    playJarvisSound('engage');
     await window.dockAPI.saveScratchpad('');
-    showToast('Scratchpad cleared');
+    showToast('Scratchpad Memory Purged');
   }
 });
 
 // -------------------------------------------------------------
-// Preferences Drawer
+// Settings Drawer
 // -------------------------------------------------------------
 function openSettings() {
   closeAllDrawers();
+  playJarvisSound('blip');
   settingsDrawer.classList.add('open');
-  checkWindowExpansion();
 }
 
 openSettingsBtn.addEventListener('click', () => {
@@ -833,24 +975,35 @@ closeSettingsBtn.addEventListener('click', closeAllDrawers);
 
 segmentBtns.forEach((btn) => {
   btn.addEventListener('click', async () => {
+    playJarvisSound('blip');
     currentSettings.dockPosition = btn.dataset.position;
     if (window.dockAPI) {
       await window.dockAPI.saveSettings(currentSettings);
     }
     applySettings(currentSettings);
-    showToast(`Dock moved to ${currentSettings.dockPosition} edge`);
+    showToast(`HUD Anchored to ${currentSettings.dockPosition} Flank`);
   });
 });
 
 colorDots.forEach((dot) => {
   dot.addEventListener('click', async () => {
+    playJarvisSound('blip');
     currentSettings.accentColor = dot.dataset.color;
     if (window.dockAPI) {
       await window.dockAPI.saveSettings(currentSettings);
     }
     applySettings(currentSettings);
-    showToast('Theme accent applied');
+    showToast('Reactor Core Palette Reconfigured');
   });
+});
+
+showLabelsSwitch.addEventListener('change', async (e) => {
+  currentSettings.showLabels = e.target.checked;
+  if (window.dockAPI) {
+    await window.dockAPI.saveSettings(currentSettings);
+  }
+  renderShortcuts();
+  showToast(currentSettings.showLabels ? 'Protocol Labels Visible' : 'Protocol Labels Hidden');
 });
 
 saveHotkeyBtn.addEventListener('click', async () => {
@@ -858,10 +1011,11 @@ saveHotkeyBtn.addEventListener('click', async () => {
   if (hotkey && window.dockAPI) {
     const success = await window.dockAPI.updateHotkey(hotkey);
     if (success) {
+      playJarvisSound('engage');
       currentSettings.hotkey = hotkey;
-      showToast(`Hotkey set to ${hotkey}`);
+      showToast(`Activation Key Calibrated: ${hotkey}`);
     } else {
-      showToast('Hotkey invalid or reserved');
+      showToast('Hotkey Conflict or Reserved');
     }
   }
 });
@@ -871,7 +1025,7 @@ launchBootSwitch.addEventListener('change', async (e) => {
   if (window.dockAPI) {
     await window.dockAPI.setLoginItem(currentSettings.launchOnBoot);
   }
-  showToast(currentSettings.launchOnBoot ? 'Auto-Launch on Boot enabled' : 'Auto-Launch on Boot disabled');
+  showToast(currentSettings.launchOnBoot ? 'Auto-Boot Initialized' : 'Auto-Boot Deactivated');
 });
 
 autohideSwitch.addEventListener('change', async (e) => {
@@ -880,7 +1034,7 @@ autohideSwitch.addEventListener('change', async (e) => {
     await window.dockAPI.saveSettings(currentSettings);
   }
   applySettings(currentSettings);
-  showToast(currentSettings.autoHide ? 'Auto-Hide Enabled' : 'Dock Pinned');
+  showToast(currentSettings.autoHide ? 'Cloaking Engaged' : 'Cloaking Disengaged');
 });
 
 toggleAutoHideBtn.addEventListener('click', async () => {
@@ -889,7 +1043,7 @@ toggleAutoHideBtn.addEventListener('click', async () => {
     await window.dockAPI.saveSettings(currentSettings);
   }
   applySettings(currentSettings);
-  showToast(currentSettings.autoHide ? 'Auto-Hide Enabled' : 'Dock Pinned');
+  showToast(currentSettings.autoHide ? 'Cloaking Engaged' : 'Cloaking Disengaged');
 });
 
 closeBtn.addEventListener('click', () => {

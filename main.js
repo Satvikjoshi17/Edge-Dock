@@ -13,17 +13,18 @@ if (!gotTheLock) {
 
 let mainWindow = null;
 let isVisible = true;
-let isExpanded = false;
 let tray = null;
 let store = null;
 
-const DOCK_WIDTH = 68;
-const EXPANDED_WIDTH = 340;
+// Fixed stable window size - prevents any hover flicker / position jumping
+const WINDOW_WIDTH = 380;
+const DOCK_WIDTH = 76;
 
 const defaultShortcuts = [
-  { id: '1', name: 'VS Code', path: 'code', iconType: 'svg', icon: 'code' },
-  { id: '2', name: 'GitHub', path: 'https://github.com', iconType: 'url', icon: 'web' },
-  { id: '3', name: 'Terminal', path: 'wt', iconType: 'svg', icon: 'terminal' }
+  { id: '1', name: 'VS Code', path: 'code', iconType: 'svg', icon: 'code', tag: 'CODE' },
+  { id: '2', name: 'GitHub', path: 'https://github.com', iconType: 'url', icon: 'web', tag: 'WEB' },
+  { id: '3', name: 'Terminal', path: 'wt', iconType: 'svg', icon: 'terminal', tag: 'TERM' },
+  { id: '4', name: 'Command Prompt', path: 'cmd', iconType: 'svg', icon: 'terminal', tag: 'CMD' }
 ];
 
 const defaultSettings = {
@@ -31,7 +32,8 @@ const defaultSettings = {
   autoHide: false,
   hotkey: 'Alt+Space',
   launchOnBoot: true,
-  accentColor: '#00f2fe'
+  accentColor: '#00f0ff', // JARVIS Arc-Reactor Cyan
+  showLabels: true
 };
 
 function getSettings() {
@@ -39,19 +41,17 @@ function getSettings() {
   return { ...defaultSettings, ...(store.get('settings') || {}) };
 }
 
-function updateWindowBounds(expanded = isExpanded) {
+function updateWindowBounds() {
   if (!mainWindow) return;
-  isExpanded = expanded;
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.workAreaSize;
   const settings = getSettings();
-  const targetWidth = isExpanded ? EXPANDED_WIDTH : DOCK_WIDTH;
 
-  const x = settings.dockPosition === 'left' ? 0 : width - targetWidth;
+  const x = settings.dockPosition === 'left' ? 0 : width - WINDOW_WIDTH;
   mainWindow.setBounds({
     x,
     y: 0,
-    width: targetWidth,
+    width: WINDOW_WIDTH,
     height
   });
 }
@@ -60,10 +60,10 @@ function createSidebar() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.workAreaSize;
   const settings = getSettings();
-  const x = settings.dockPosition === 'left' ? 0 : width - DOCK_WIDTH;
+  const x = settings.dockPosition === 'left' ? 0 : width - WINDOW_WIDTH;
 
   mainWindow = new BrowserWindow({
-    width: DOCK_WIDTH,
+    width: WINDOW_WIDTH,
     height,
     x,
     y: 0,
@@ -83,10 +83,17 @@ function createSidebar() {
 
   mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
 
-  // Multi-monitor and resolution change listeners
-  screen.on('display-metrics-changed', () => updateWindowBounds(isExpanded));
-  screen.on('display-added', () => updateWindowBounds(isExpanded));
-  screen.on('display-removed', () => updateWindowBounds(isExpanded));
+  // Start with forwarding enabled for transparent area
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setIgnoreMouseEvents(true, { forward: true });
+    }
+  });
+
+  // Multi-monitor and resolution listeners
+  screen.on('display-metrics-changed', updateWindowBounds);
+  screen.on('display-added', updateWindowBounds);
+  screen.on('display-removed', updateWindowBounds);
 
   mainWindow.on('close', (event) => {
     if (!app.isQuitting) {
@@ -101,7 +108,6 @@ function createSidebar() {
     if (currentSettings.autoHide && isVisible && mainWindow) {
       mainWindow.hide();
       isVisible = false;
-      isExpanded = false;
     }
   });
 }
@@ -144,11 +150,11 @@ function createTray() {
     const settings = getSettings();
     const contextMenu = Menu.buildFromTemplate([
       {
-        label: `Toggle Dock (${settings.hotkey})`,
+        label: `J.A.R.V.I.S. Core (${settings.hotkey})`,
         click: () => toggleSidebar()
       },
       {
-        label: settings.autoHide ? 'Auto-Hide: Enabled' : 'Auto-Hide: Disabled',
+        label: settings.autoHide ? 'Auto-Hide: Active' : 'Auto-Hide: Off',
         type: 'checkbox',
         checked: settings.autoHide,
         click: () => {
@@ -162,16 +168,16 @@ function createTray() {
         }
       },
       {
-        label: `Dock Position: ${settings.dockPosition === 'left' ? 'Left Edge' : 'Right Edge'}`,
+        label: `HUD Anchor: ${settings.dockPosition === 'left' ? 'Left Edge' : 'Right Edge'}`,
         submenu: [
           {
-            label: 'Right Side',
+            label: 'Right Edge',
             type: 'radio',
             checked: settings.dockPosition === 'right',
             click: () => {
               settings.dockPosition = 'right';
               store.set('settings', settings);
-              updateWindowBounds(isExpanded);
+              updateWindowBounds();
               if (mainWindow) {
                 mainWindow.webContents.send('settings-updated', settings);
               }
@@ -179,13 +185,13 @@ function createTray() {
             }
           },
           {
-            label: 'Left Side',
+            label: 'Left Edge',
             type: 'radio',
             checked: settings.dockPosition === 'left',
             click: () => {
               settings.dockPosition = 'left';
               store.set('settings', settings);
-              updateWindowBounds(isExpanded);
+              updateWindowBounds();
               if (mainWindow) {
                 mainWindow.webContents.send('settings-updated', settings);
               }
@@ -196,7 +202,7 @@ function createTray() {
       },
       { type: 'separator' },
       {
-        label: 'Quit EdgeDock',
+        label: 'Shutdown J.A.R.V.I.S.',
         click: () => {
           app.isQuitting = true;
           app.quit();
@@ -206,7 +212,7 @@ function createTray() {
     tray.setContextMenu(contextMenu);
   }
 
-  tray.setToolTip('EdgeDock - Quick Launcher & Toolbox');
+  tray.setToolTip('EdgeDock - J.A.R.V.I.S. HUD');
   rebuildContextMenu();
 
   tray.on('click', () => {
@@ -219,9 +225,8 @@ function toggleSidebar() {
   if (isVisible) {
     mainWindow.hide();
     isVisible = false;
-    isExpanded = false;
   } else {
-    updateWindowBounds(false);
+    updateWindowBounds();
     mainWindow.show();
     mainWindow.focus();
     isVisible = true;
@@ -236,6 +241,15 @@ app.on('second-instance', () => {
       isVisible = true;
     }
     mainWindow.focus();
+  }
+});
+
+// -------------------------------------------------------------
+// Mouse Event Forwarding (Fixes hover glitch completely)
+// -------------------------------------------------------------
+ipcMain.on('set-ignore-mouse', (event, ignore) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setIgnoreMouseEvents(Boolean(ignore), { forward: true });
   }
 });
 
@@ -272,7 +286,7 @@ function startClipboardMonitor() {
 }
 
 // -------------------------------------------------------------
-// Power Tool 2: YouTube / Media Engine Helper
+// Power Tool 2: YouTube / Media Engine & Search
 // -------------------------------------------------------------
 function getBundledYtdlPath() {
   const binDir = path.join(app.getPath('userData'), 'bin');
@@ -295,7 +309,7 @@ function resolveYtdlPath() {
 
 function downloadFileWithRedirects(url, destPath, onProgress) {
   return new Promise((resolve, reject) => {
-    https.get(url, { headers: { 'User-Agent': 'EdgeDock-MediaDownloader' } }, (res) => {
+    https.get(url, { headers: { 'User-Agent': 'EdgeDock-JARVIS-Engine' } }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         return downloadFileWithRedirects(res.headers.location, destPath, onProgress).then(resolve).catch(reject);
       }
@@ -330,6 +344,94 @@ function downloadFileWithRedirects(url, destPath, onProgress) {
   });
 }
 
+// Search YouTube by name/query
+ipcMain.handle('search-youtube', async (event, query) => {
+  if (!query || typeof query !== 'string') return [];
+  const trimmed = query.trim();
+
+  // If direct URL, return oembed info
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return new Promise((resolve) => {
+      const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(trimmed)}&format=json`;
+      https.get(oembedUrl, (res) => {
+        let raw = '';
+        res.on('data', (c) => raw += c);
+        res.on('end', () => {
+          try {
+            const data = JSON.parse(raw);
+            resolve([{
+              id: 'direct',
+              title: data.title || 'Direct Video Stream',
+              url: trimmed,
+              channel: data.author_name || 'YouTube',
+              thumbnail: data.thumbnail_url || '',
+              duration: 'Direct Link'
+            }]);
+          } catch {
+            resolve([{
+              id: 'direct',
+              title: trimmed,
+              url: trimmed,
+              channel: 'Direct Link',
+              thumbnail: '',
+              duration: ''
+            }]);
+          }
+        });
+      }).on('error', () => {
+        resolve([{ id: 'direct', title: trimmed, url: trimmed, channel: 'Web Video', thumbnail: '', duration: '' }]);
+      });
+    });
+  }
+
+  // Fast search scrape
+  return new Promise((resolve) => {
+    const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(trimmed)}`;
+    https.get(searchUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } }, (res) => {
+      let data = '';
+      res.on('data', (chunk) => data += chunk);
+      res.on('end', () => {
+        const match = data.match(/ytInitialData\s*=\s*({.+?});<\/script>/);
+        if (match) {
+          try {
+            const json = JSON.parse(match[1]);
+            const contents = json.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents[0]?.itemSectionRenderer?.contents || [];
+            const results = [];
+            for (const item of contents) {
+              const v = item.videoRenderer;
+              if (v && v.videoId) {
+                const title = v.title?.runs?.[0]?.text || '';
+                const channel = v.ownerText?.runs?.[0]?.text || '';
+                const duration = v.lengthText?.simpleText || '';
+                const thumbs = v.thumbnail?.thumbnails || [];
+                const thumbnail = thumbs.length > 0 ? thumbs[thumbs.length - 1].url : `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`;
+
+                results.push({
+                  id: v.videoId,
+                  title,
+                  url: `https://www.youtube.com/watch?v=${v.videoId}`,
+                  duration,
+                  channel,
+                  thumbnail
+                });
+                if (results.length >= 6) break;
+              }
+            }
+            resolve(results);
+            return;
+          } catch (e) {
+            console.error('YouTube search parse error:', e);
+          }
+        }
+        resolve([]);
+      });
+    }).on('error', (err) => {
+      console.error('YouTube search request error:', err);
+      resolve([]);
+    });
+  });
+});
+
 // App Ready
 app.whenReady().then(async () => {
   const Store = (await import('electron-store')).default;
@@ -359,18 +461,16 @@ app.whenReady().then(async () => {
 ipcMain.handle('launch-target', async (event, targetPath) => {
   try {
     if (!targetPath || typeof targetPath !== 'string') {
-      return { success: false, error: 'Invalid path provided' };
+      return { success: false, error: 'Invalid target path' };
     }
 
     const trimmed = targetPath.trim();
 
-    // 1. URLs
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
       await shell.openExternal(trimmed);
       return { success: true };
     }
 
-    // 2. File / Directory / Application path
     if (trimmed.includes('/') || trimmed.includes('\\') || trimmed.includes(':')) {
       const errorMessage = await shell.openPath(trimmed);
       if (errorMessage) {
@@ -379,14 +479,13 @@ ipcMain.handle('launch-target', async (event, targetPath) => {
       return { success: true };
     }
 
-    // 3. Recognized command line tools
     const child = spawn(trimmed, [], {
       detached: true,
       stdio: 'ignore',
       shell: false
     });
     child.on('error', (err) => {
-      console.error('Command spawn error:', err);
+      console.error('Spawn error:', err);
     });
     child.unref();
 
@@ -395,11 +494,6 @@ ipcMain.handle('launch-target', async (event, targetPath) => {
     console.error('Launch Error:', err);
     return { success: false, error: err.message || 'Execution failed' };
   }
-});
-
-// IPC: Window Expand / Collapse
-ipcMain.on('set-expanded', (event, expanded) => {
-  updateWindowBounds(Boolean(expanded));
 });
 
 // IPC: Hotkey Update
@@ -447,10 +541,10 @@ ipcMain.handle('get-file-icon', async (event, filePath) => {
 ipcMain.handle('select-file', async () => {
   if (!mainWindow) return null;
   const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'Select Application or File to Pin',
+    title: 'Select Application or Protocol for HUD',
     properties: ['openFile'],
     filters: [
-      { name: 'Programs & Shortcuts', extensions: ['exe', 'lnk', 'bat', 'cmd', 'url'] },
+      { name: 'Programs & Executables', extensions: ['exe', 'lnk', 'bat', 'cmd', 'url'] },
       { name: 'All Files', extensions: ['*'] }
     ]
   });
@@ -503,7 +597,7 @@ ipcMain.handle('get-settings', () => {
 ipcMain.handle('save-settings', (event, newSettings) => {
   if (store && typeof newSettings === 'object') {
     store.set('settings', newSettings);
-    updateWindowBounds(isExpanded);
+    updateWindowBounds();
   }
   return true;
 });
@@ -513,7 +607,6 @@ ipcMain.on('hide-window', () => {
   if (mainWindow) {
     mainWindow.hide();
     isVisible = false;
-    isExpanded = false;
   }
 });
 
@@ -562,7 +655,7 @@ ipcMain.handle('check-ytdl-status', () => {
   return { installed: Boolean(binary), path: binary };
 });
 
-ipcMain.handle('install-ytdl', async (event) => {
+ipcMain.handle('install-ytdl', async () => {
   try {
     const binDir = path.join(app.getPath('userData'), 'bin');
     if (!fs.existsSync(binDir)) {
@@ -590,11 +683,11 @@ ipcMain.handle('start-media-download', async (event, { url, format }) => {
   try {
     const binary = resolveYtdlPath();
     if (!binary) {
-      return { success: false, error: 'Media engine not installed. Click "Setup Engine" first.' };
+      return { success: false, error: 'J.A.R.V.I.S. Media Core offline. Click "Initiate Core Protocol" to download yt-dlp engine.' };
     }
 
     if (!url || typeof url !== 'string') {
-      return { success: false, error: 'Please enter a valid YouTube/video URL or title' };
+      return { success: false, error: 'Invalid media URL' };
     }
 
     const downloadsDir = app.getPath('downloads');
@@ -606,15 +699,12 @@ ipcMain.handle('start-media-download', async (event, { url, format }) => {
       args.push('-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best', '-o', '%(title)s.%(ext)s');
     }
 
-    // Support searching by name: if not starting with http, prepend ytsearch1:
-    const target = url.trim().startsWith('http') ? url.trim() : `ytsearch1:${url.trim()}`;
-    args.push(target);
+    args.push(url.trim());
 
     currentDownloadProcess = spawn(binary, args, { windowsHide: true });
 
     currentDownloadProcess.stdout.on('data', (data) => {
       const output = data.toString();
-      // Match [download]  45.2% of 15.00MiB at 4.20MiB/s ETA 00:02
       const match = output.match(/\[download\]\s+(\d+\.?\d*)%\s+of\s+([^\s]+)\s+at\s+([^\s]+)\s+ETA\s+([^\s\r\n]+)/);
       if (match && mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('download-progress', {
@@ -626,17 +716,13 @@ ipcMain.handle('start-media-download', async (event, { url, format }) => {
       }
     });
 
-    currentDownloadProcess.stderr.on('data', (data) => {
-      console.warn('yt-dlp stderr:', data.toString());
-    });
-
     currentDownloadProcess.on('close', (code) => {
       currentDownloadProcess = null;
       if (mainWindow && !mainWindow.isDestroyed()) {
         if (code === 0) {
           mainWindow.webContents.send('download-complete', { success: true });
         } else {
-          mainWindow.webContents.send('download-complete', { success: false, error: `Process exited with code ${code}` });
+          mainWindow.webContents.send('download-complete', { success: false, error: `Protocol exited with code ${code}` });
         }
       }
     });

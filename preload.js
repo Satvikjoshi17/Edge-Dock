@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('dockAPI', {
   getSettings: () => ipcRenderer.invoke('get-settings'),
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
   setExpanded: (expanded) => ipcRenderer.send('set-expanded', expanded),
+  setIgnoreMouse: (ignore) => ipcRenderer.send('set-ignore-mouse', ignore),
   updateHotkey: (hotkey) => ipcRenderer.invoke('update-hotkey', hotkey),
   setLoginItem: (enable) => ipcRenderer.invoke('set-login-item', enable),
   hideWindow: () => ipcRenderer.send('hide-window'),
@@ -27,9 +28,10 @@ contextBridge.exposeInMainWorld('dockAPI', {
   getScratchpad: () => ipcRenderer.invoke('get-scratchpad'),
   saveScratchpad: (text) => ipcRenderer.invoke('save-scratchpad', text),
 
-  // Power Tool: Media / YouTube Downloader
+  // Power Tool: Media / YouTube Downloader & Search
   checkYtdlStatus: () => ipcRenderer.invoke('check-ytdl-status'),
   installYtdl: () => ipcRenderer.invoke('install-ytdl'),
+  searchYouTube: (query) => ipcRenderer.invoke('search-youtube', query),
   startMediaDownload: (options) => ipcRenderer.invoke('start-media-download', options),
   openDownloadsFolder: () => ipcRenderer.invoke('open-downloads-folder'),
   onDownloadProgress: (callback) => ipcRenderer.on('download-progress', (event, data) => callback(data)),

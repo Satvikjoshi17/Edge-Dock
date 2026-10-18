@@ -1,53 +1,58 @@
-# ⚡ EdgeDock
+# ⚡ EdgeDock // J.A.R.V.I.S. HUD
 
-> A sleek, neo-glass native desktop overlay quick-launcher & power productivity toolbox built with Electron.
+> A Stark Industries inspired holographic desktop quick-launcher & tactical productivity toolbox built with Electron.
 
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=flat-square&logo=windows)
 ![Electron](https://img.shields.io/badge/Electron-31.0.0-47848F?style=flat-square&logo=electron)
-![License](https://img.shields.io/badge/License-MIT-00f2fe?style=flat-square)
+![License](https://img.shields.io/badge/License-MIT-00f0ff?style=flat-square)
 
-EdgeDock is a non-intrusive, ultra-fast sidebar launcher and productivity toolbox that docks neatly to the edge of your screen. In addition to one-click launching of desktop applications, shell utilities, and web URLs, it features built-in **Power Tools** including a YouTube/media downloader, clipboard history manager, and auto-saving scratchpad.
+EdgeDock transforms your desktop into an authentic, ultra-responsive **J.A.R.V.I.S. HUD** (Heads-Up Display). It combines non-intrusive edge-docked application launching with an interactive media acquisition engine, background data buffer (clipboard manager), and instant tactical memory scratchpad.
+
+---
+
+## 🦾 J.A.R.V.I.S. HUD Experience
+
+- **⚡ Spinning Arc Reactor Core**: Animated, concentric spinning Arc Reactor in the HUD header with real-time status pulses and Stark telemetry readouts.
+- **🏷️ Distinct App Labels & Monogram Badges**: Every pinned tool displays a high-visibility designation label and monogram badge (`CMD`, `TERM`, `CODE`, `WEB`, `DIR`), instantly distinguishing tools with identical system icons (e.g. Command Prompt vs. Windows Terminal).
+- **🛡️ 100% Zero-Glitch Mouse Forwarding**: Fixed stable window dimensions paired with Electron's `setIgnoreMouseEvents` forwarder. Zero window jumping, zero flicker, and seamless click-through on transparent desktop areas.
+- **🔊 Synthesized Tactical Audio**: Lightweight, zero-latency Web Audio sound blips and engagement chimes on hover and interactions.
+- **🌈 Reactor Core Palettes**: Reconfigure your HUD with 5 Stark themes: **Arc Reactor Cyan**, **Stark Gold / Amber**, **Mark LXXXV Crimson**, **Vibranium Green**, and **Quantum Violet**.
 
 ---
 
 ## 🧰 Built-In Power Tools
 
-### 1. 🎬 Media & YouTube Downloader
-- **Link & Search Support**: Paste any YouTube / web video link, or simply type a song / video title to search and download.
-- **Multiple Formats**: One-click download as **MP4 Video** (highest resolution) or **MP3 Audio** (320kbps).
-- **Self-Healing Engine**: Automatically checks for `yt-dlp` and provides a 1-click automatic setup helper that installs the official engine into user app data.
-- **Live Progress**: Real-time download percentage, download speed (MiB/s), and estimated time remaining (ETA).
-- **Quick Access**: Dedicated button to open the Downloads folder directly.
+### 1. 🎬 Media Acquisition Protocol (YouTube & Web Video)
+- **Interactive Search Scanner**: Type any video title or topic (e.g. `Iron Man soundtrack`), scan live streams, and preview results with **16:9 thumbnails, channel names, and duration badges**.
+- **1-Click Download**: Choose the exact video you want, select format (**MP4 1080p** or **MP3 320k**), and download with real-time progress, speed (MiB/s), and ETA readouts.
+- **Direct Link Support**: Paste direct YouTube / video URLs for instant stream extraction.
+- **Automated Engine Synchronizer**: 1-click automatic `yt-dlp` core installer if missing.
 
-### 2. 📋 Clipboard History Manager
-- **Background Clip Capture**: Automatically monitors and records copied text, URLs, and code snippets.
-- **Search & Filter**: Real-time instant search across your clipboard history.
-- **1-Click Copy**: Click any clip card to instantly copy it back to your active clipboard.
-- **Clean Management**: Clear history anytime with one click.
+### 2. 📋 Data Buffer (Clipboard History)
+- **Passive Memory Capture**: Automatically logs copied text, tokens, links, and code snippets in the background.
+- **Instant Query Scanner**: Filter and search clips in real time.
+- **1-Click Buffer Load**: Click any card to load it directly to your active Windows clipboard.
 
-### 3. 📝 Quick Scratchpad
-- **Zero-Latency Notes**: An instant flyout scratchpad for temporary tokens, commands, scratch code, and quick ideas.
-- **Instant Auto-Save**: Seamlessly persists across reboots and app launches with debounced background storage.
-- **Word & Character Counters**: Live stats on your active note.
-- **Fast Actions**: Quick "Copy All" and "Clear" buttons.
+### 3. 📝 Tactical Scratchpad
+- **Zero-Latency Memory Buffer**: Ephemeral notes, API keys, JSON payloads, or curl commands right on your screen edge.
+- **Real-Time Auto-Save**: Seamlessly persisted across restarts and reboots.
+- **Telemetry Counter**: Live character and word counters.
 
 ---
 
-## ✨ Core Features
+## ⌨️ Controls & Shortcuts
 
-- **🛡️ Secure Native Execution**: Direct application execution and URL routing through Electron's native shell APIs—protecting against command injection.
-- **🎨 Native Icon Extraction**: Automatically extracts high-resolution native icons from Windows `.exe`, `.lnk`, and system files using `app.getFileIcon()`. Web URLs fetch real favicons automatically.
-- **🌈 Custom Theme Accents**: Choose between 5 cyberpunk neon themes (Cyan Glow, Synthwave Violet, Cyber Yellow, Matrix Emerald, Pulse Crimson).
-- **📐 Left / Right Docking**: Dock cleanly on either the Left or Right screen edge with immediate UI repositioning.
-- **📂 Explorer Drag-and-Drop**: Drag applications or files straight from Windows File Explorer onto the dock to instantly pin them.
-- **↕️ Interactive Tile Reordering**: Drag and drop tiles within the launcher stream to rearrange them effortlessly.
-- **🖱️ Right-Click Context Menu**: Instant options to Launch, Reveal in File Explorer, Edit, or Remove pins.
-- **🗂️ Native File Picker**: Browse and select any program with the native Windows file dialog—no manual path typing required.
-- **🖥️ Multi-Monitor & Resolution Resilient**: Automatically recalculates work area bounds and docks securely during monitor connect/disconnect or resolution changes.
-- **🔍 Smart Window Expansion**: Dynamically expands transparent viewport bounds on hover to render full-fidelity holographic tooltips and flyouts with zero viewport clipping.
-- **📌 Pin vs. Auto-Hide Peek**: Toggle between a pinned dock and auto-hide with edge-hover slide-in.
-- **⚙️ Preferences Drawer**: Manage docking position, auto-launch on startup, custom global hotkeys, and accent colors directly inside the app.
-- **🔒 Single Instance Lock**: Ensures only one background process runs with complete system tray management.
+| Action | Shortcut / Trigger |
+| :--- | :--- |
+| **Toggle J.A.R.V.I.S. HUD** | `Alt+Space` (Configurable in Preferences) or Tray Icon |
+| **Media Downloader** | Click Cloud / Download icon on HUD rail |
+| **Data Buffer (Clipboard)** | Click Clipboard icon on HUD rail |
+| **Tactical Scratchpad** | Click Pencil icon on HUD rail |
+| **Pin Protocol** | Drop file from Explorer onto rail or click `+` |
+| **Reorder Pins** | Drag and drop tiles inside the rail |
+| **Calibrate Pin** | Right-click any pinned tile (Launch, Reveal, Edit, Purge) |
+| **HUD Configuration** | Click Gear icon in the footer |
+| **Cloak / Standby** | Top `X` button, `Alt+Space`, or click outside (if auto-cloak enabled) |
 
 ---
 
@@ -70,7 +75,7 @@ EdgeDock is a non-intrusive, ultra-fast sidebar launcher and productivity toolbo
    npm install
    ```
 
-3. **Start in development:**
+3. **Start J.A.R.V.I.S.:**
    ```bash
    npm start
    ```
@@ -79,33 +84,6 @@ EdgeDock is a non-intrusive, ultra-fast sidebar launcher and productivity toolbo
    ```bash
    npm run dist
    ```
-
----
-
-## ⌨️ Controls & Shortcuts
-
-| Action | Shortcut / Trigger |
-| :--- | :--- |
-| **Toggle Dock Visibility** | `Alt+Space` (Configurable in Preferences) or Tray Icon |
-| **Media Downloader** | Click Cloud / Download icon on dock rail |
-| **Clipboard History** | Click Clipboard icon on dock rail |
-| **Scratchpad** | Click Pencil icon on dock rail |
-| **Pin Item** | Drop file from Explorer onto dock or click `+` |
-| **Reorder Pins** | Drag and drop tiles inside the rail |
-| **Context Menu** | Right-click any pinned tile |
-| **Preferences** | Click Gear icon in the dock footer |
-| **Hide Dock** | Top `X` button, `Alt+Space`, or click outside (if auto-hide enabled) |
-
----
-
-## 🛠️ Tech Stack
-
-- **Runtime**: Electron 31
-- **Packaging**: `electron-builder` (NSIS & Portable target)
-- **Media Engine**: `yt-dlp` (auto-installed or system binary)
-- **Storage**: `electron-store`
-- **UI Architecture**: Vanilla HTML5, Neo-Glass CSS, Modular JavaScript
-- **System APIs**: Electron ContextBridge, Clipboard, NativeImage, IPCMain / IPCRenderer, Screen Metrics
 
 ---
 
