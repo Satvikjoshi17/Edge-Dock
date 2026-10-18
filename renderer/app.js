@@ -229,7 +229,7 @@ async function init() {
     });
 
     window.dockAPI.onSummonQuickAction((text) => {
-      openHologramPods(text);
+      toggleHologramPods(text);
     });
   }
 
@@ -1107,6 +1107,23 @@ function closeHologramPods() {
   dropPods.forEach((pod) => pod.classList.remove('drag-over'));
 }
 
+async function toggleHologramPods(text = '') {
+  if (hologramPodsDrawer.classList.contains('open')) {
+    closeHologramPods();
+    playJarvisSound('blip');
+    showToast('Hologram Conduit Disengaged');
+  } else {
+    let payload = (text || currentQuickText || '').trim();
+    if (!payload && window.dockAPI) {
+      const history = await window.dockAPI.getClipboardHistory();
+      if (history && history.length > 0) {
+        payload = (history[0] || '').trim();
+      }
+    }
+    openHologramPods(payload);
+  }
+}
+
 async function executePodAction(action, payloadText = currentQuickText) {
   let text = (payloadText || currentQuickText || '').trim();
 
@@ -1199,11 +1216,24 @@ async function executePodAction(action, payloadText = currentQuickText) {
 }
 
 // -------------------------------------------------------------
-// Effortless Drag & Drop Listeners (No awkward modifier keys!)
+// Drag & Drop + Key Press Toggle Ingestion Conduit
 // -------------------------------------------------------------
+let lastShiftPressed = false;
+let userToggledOffDuringDrag = false;
+
+window.addEventListener('dragstart', () => {
+  userToggledOffDuringDrag = false;
+  lastShiftPressed = false;
+});
+
+window.addEventListener('dragend', () => {
+  userToggledOffDuringDrag = false;
+  lastShiftPressed = false;
+});
+
 window.addEventListener('dragenter', (e) => {
   e.preventDefault();
-  if (!hologramPodsDrawer.classList.contains('open')) {
+  if (!userToggledOffDuringDrag && !hologramPodsDrawer.classList.contains('open')) {
     openHologramPods(currentQuickText || window.getSelection().toString() || '');
   }
 });
@@ -1213,7 +1243,20 @@ window.addEventListener('dragover', (e) => {
   if (e.dataTransfer) {
     e.dataTransfer.dropEffect = 'copy';
   }
-  if (!hologramPodsDrawer.classList.contains('open')) {
+
+  // Tapping Shift while dragging toggles hologram ON / OFF
+  if (e.shiftKey !== lastShiftPressed) {
+    lastShiftPressed = e.shiftKey;
+    if (e.shiftKey) {
+      if (hologramPodsDrawer.classList.contains('open')) {
+        userToggledOffDuringDrag = true;
+        toggleHologramPods();
+      } else {
+        userToggledOffDuringDrag = false;
+        toggleHologramPods(currentQuickText || window.getSelection().toString() || '');
+      }
+    }
+  } else if (!userToggledOffDuringDrag && !hologramPodsDrawer.classList.contains('open')) {
     openHologramPods(currentQuickText || window.getSelection().toString() || '');
   }
 });
@@ -1221,11 +1264,15 @@ window.addEventListener('dragover', (e) => {
 window.addEventListener('dragleave', (e) => {
   if (!e.relatedTarget && (e.clientX <= 0 || e.clientY <= 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight)) {
     closeHologramPods();
+    userToggledOffDuringDrag = false;
+    lastShiftPressed = false;
   }
 });
 
 window.addEventListener('drop', (e) => {
   e.preventDefault();
+  userToggledOffDuringDrag = false;
+  lastShiftPressed = false;
   // If not dropped directly on a pod, gracefully close
   if (!e.target.closest('.drop-pod')) {
     closeHologramPods();
@@ -1287,25 +1334,61 @@ dropPods.forEach((pod) => {
 
 closePodsBtn.addEventListener('click', closeHologramPods);
 
-toolPodsBtn.addEventListener('click', async () => {
-  if (hologramPodsDrawer.classList.contains('open')) {
-    closeHologramPods();
-  } else {
-    let text = '';
-    if (window.dockAPI) {
-      const history = await window.dockAPI.getClipboardHistory();
-      if (history && history.length > 0) {
-        text = history[0];
-      }
-    }
-    openHologramPods(text);
-  }
+toolPodsBtn.addEventListener('click', () => {
+  toggleHologramPods();
 });
 
+// Accelerator Matcher Helper
+function isMatchingHotkey(e, hotkeyStr) {
+  if (!hotkeyStr) return false;
+  const parts = hotkeyStr.toLowerCase().split('+').map((p) => p.trim());
+  const hasAlt = parts.includes('alt');
+  const hasCtrl = parts.includes('ctrl') || parts.includes('control');
+  const hasShift = parts.includes('shift');
+  const hasMeta = parts.includes('command') || parts.includes('meta') || parts.includes('cmd');
+
+  if (e.altKey !== hasAlt) return false;
+  if (e.ctrlKey !== hasCtrl) return false;
+  if (e.shiftKey !== hasShift) return false;
+  if (e.metaKey !== hasMeta) return false;
+
+  const keyPart = parts.find((p) => !['alt', 'ctrl', 'control', 'shift', 'command', 'meta', 'cmd'].includes(p));
+  if (!keyPart) return true;
+
+  if (keyPart === 'space' && (e.key === ' ' || e.code === 'Space')) return true;
+  return (
+    e.key.toLowerCase() === keyPart ||
+    e.code.toLowerCase() === `key${keyPart}` ||
+    e.code.toLowerCase() === keyPart
+  );
+}
+
+// Global window keydown listener (Toggles Hologram Pods on key press)
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     closeHologramPods();
     closeAllDrawers();
+    return;
+  }
+
+  // Do not intercept if typing in a form input or textarea
+  if (e.target && e.target.matches('input, textarea')) {
+    return;
+  }
+
+  // Pressing Shift key toggles on and off
+  if (e.key === 'Shift' && !e.repeat) {
+    userToggledOffDuringDrag = hologramPodsDrawer.classList.contains('open');
+    toggleHologramPods();
+    return;
+  }
+
+  // Pressing configured Quick Action hotkey (e.g. Alt+Q) toggles on and off
+  if (isMatchingHotkey(e, currentSettings.quickHotkey)) {
+    e.preventDefault();
+    userToggledOffDuringDrag = hologramPodsDrawer.classList.contains('open');
+    toggleHologramPods();
+    return;
   }
 });
 
