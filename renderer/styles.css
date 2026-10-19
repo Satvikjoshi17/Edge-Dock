@@ -9,9 +9,10 @@
 
   /* Dynamic HUD Optics & Density */
   --hud-blur: 26px;
-  --hud-tint-opacity: 0.65;
-  --jarvis-glass: linear-gradient(180deg, rgba(0, 20, 44, var(--hud-tint-opacity)) 0%, rgba(0, 10, 26, calc(var(--hud-tint-opacity) + 0.12)) 50%, rgba(0, 24, 52, var(--hud-tint-opacity)) 100%);
-  --jarvis-drawer-glass: linear-gradient(135deg, rgba(1, 22, 48, calc(var(--hud-tint-opacity) + 0.15)) 0%, rgba(0, 12, 28, var(--hud-tint-opacity)) 50%, rgba(1, 30, 62, calc(var(--hud-tint-opacity) + 0.12)) 100%);
+  --hud-tint-opacity: 0.75;
+  --hud-bg-color: rgba(2, 12, 28, var(--hud-tint-opacity));
+  --jarvis-glass: rgba(0, 14, 32, var(--hud-tint-opacity));
+  --jarvis-drawer-glass: rgba(2, 12, 28, var(--hud-tint-opacity));
 
   --border-laser: rgba(0, 240, 255, 0.45);
   --border-laser-bright: rgba(0, 240, 255, 0.85);
@@ -53,9 +54,10 @@ body.dock-left {
 .jarvis-rail {
   width: 78px;
   height: 100%;
-  background: var(--jarvis-glass);
-  backdrop-filter: blur(var(--hud-blur)) saturate(260%) contrast(110%);
-  -webkit-backdrop-filter: blur(var(--hud-blur)) saturate(260%) contrast(110%);
+  background-color: var(--jarvis-glass);
+  background-image: linear-gradient(180deg, rgba(0, 240, 255, 0.07) 0%, transparent 50%, rgba(0, 240, 255, 0.04) 100%);
+  backdrop-filter: blur(var(--hud-blur)) saturate(260%) contrast(115%);
+  -webkit-backdrop-filter: blur(var(--hud-blur)) saturate(260%) contrast(115%);
   border-left: 1px solid var(--border-laser-bright);
   box-shadow: -4px 0 35px rgba(0, 240, 255, 0.28), inset 1px 0 15px rgba(0, 240, 255, 0.15);
   display: flex;
@@ -64,7 +66,7 @@ body.dock-left {
   padding: 12px 0;
   position: relative;
   z-index: 100;
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, background-color 0.15s ease, backdrop-filter 0.15s ease;
 }
 
 body.dock-left .jarvis-rail {
@@ -524,20 +526,21 @@ body.dock-left .hud-action-btn::after {
   transform: translateY(-50%) scale(0.95);
   width: 290px;
   max-height: 88vh;
-  background: var(--jarvis-drawer-glass);
+  background-color: var(--hud-bg-color);
   background-image: 
+    linear-gradient(135deg, rgba(0, 240, 255, 0.08) 0%, transparent 55%),
     linear-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 1px),
     linear-gradient(90deg, rgba(0, 240, 255, 0.04) 1px, transparent 1px);
-  background-size: 16px 16px;
-  backdrop-filter: blur(var(--hud-blur)) saturate(260%) contrast(110%);
-  -webkit-backdrop-filter: blur(var(--hud-blur)) saturate(260%) contrast(110%);
+  background-size: 100% 100%, 16px 16px, 16px 16px;
+  backdrop-filter: blur(var(--hud-blur)) saturate(260%) contrast(115%);
+  -webkit-backdrop-filter: blur(var(--hud-blur)) saturate(260%) contrast(115%);
   border: 1px solid var(--border-laser-bright);
   border-radius: 10px;
   padding: 15px;
   box-shadow: 0 0 45px rgba(0, 240, 255, 0.28), inset 0 0 25px rgba(0, 240, 255, 0.1), -12px 12px 45px rgba(0, 0, 0, 0.75);
   opacity: 0;
   pointer-events: none;
-  transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.15s ease, backdrop-filter 0.15s ease;
   z-index: 2000;
   display: flex;
   flex-direction: column;
@@ -626,7 +629,9 @@ body.dock-left .jarvis-drawer {
 
 .hud-input {
   width: 100%;
-  background: rgba(0, 18, 38, 0.7);
+  background: rgba(0, 18, 38, 0.85);
+  backdrop-filter: blur(calc(var(--hud-blur) * 0.45));
+  -webkit-backdrop-filter: blur(calc(var(--hud-blur) * 0.45));
   border: 1px solid rgba(0, 240, 255, 0.38);
   padding: 7px 10px;
   border-radius: 4px;
@@ -939,7 +944,9 @@ body.dock-left .jarvis-drawer {
 }
 
 .clip-card {
-  background: rgba(0, 240, 255, 0.05);
+  background: rgba(0, 240, 255, 0.06);
+  backdrop-filter: blur(calc(var(--hud-blur) * 0.45));
+  -webkit-backdrop-filter: blur(calc(var(--hud-blur) * 0.45));
   border: 1px solid rgba(0, 240, 255, 0.22);
   border-radius: 6px;
   padding: 8px;
@@ -997,7 +1004,9 @@ body.dock-left .jarvis-drawer {
 .hud-textarea {
   width: 100%;
   height: 190px;
-  background: rgba(0, 15, 32, 0.7);
+  background: rgba(0, 15, 32, 0.85);
+  backdrop-filter: blur(calc(var(--hud-blur) * 0.45));
+  -webkit-backdrop-filter: blur(calc(var(--hud-blur) * 0.45));
   border: 1px solid rgba(0, 240, 255, 0.38);
   border-radius: 5px;
   padding: 9px;
@@ -1187,7 +1196,9 @@ body.dock-left .jarvis-drawer {
 /* CONTEXT MENU */
 .context-menu {
   position: fixed;
-  background: rgba(0, 16, 32, 0.96);
+  background-color: var(--hud-bg-color);
+  backdrop-filter: blur(var(--hud-blur)) saturate(240%);
+  -webkit-backdrop-filter: blur(var(--hud-blur)) saturate(240%);
   border: 1px solid var(--jarvis-cyan);
   border-radius: 6px;
   padding: 5px;
@@ -1195,6 +1206,7 @@ body.dock-left .jarvis-drawer {
   box-shadow: 0 0 25px var(--jarvis-glow);
   z-index: 3000;
   display: none;
+  transition: background-color 0.15s ease, backdrop-filter 0.15s ease;
 }
 
 .context-menu.visible { display: flex; flex-direction: column; gap: 2px; }
@@ -1235,7 +1247,9 @@ body.dock-left .jarvis-drawer {
   position: fixed;
   bottom: 22px;
   right: 88px;
-  background: rgba(0, 16, 32, 0.96);
+  background-color: var(--hud-bg-color);
+  backdrop-filter: blur(var(--hud-blur)) saturate(240%);
+  -webkit-backdrop-filter: blur(var(--hud-blur)) saturate(240%);
   border: 1px solid var(--jarvis-cyan);
   color: #fff;
   padding: 8px 16px;
@@ -1272,20 +1286,21 @@ body.dock-left .toast-msg {
   right: 80px;
   transform: translateY(-50%) translateX(20px);
   width: 295px;
-  background: var(--jarvis-drawer-glass);
+  background-color: var(--hud-bg-color);
   background-image: 
+    linear-gradient(135deg, rgba(0, 240, 255, 0.08) 0%, transparent 55%),
     linear-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 1px),
     linear-gradient(90deg, rgba(0, 240, 255, 0.04) 1px, transparent 1px);
-  background-size: 16px 16px;
-  backdrop-filter: blur(var(--hud-blur)) saturate(260%) contrast(110%);
-  -webkit-backdrop-filter: blur(var(--hud-blur)) saturate(260%) contrast(110%);
+  background-size: 100% 100%, 16px 16px, 16px 16px;
+  backdrop-filter: blur(var(--hud-blur)) saturate(260%) contrast(115%);
+  -webkit-backdrop-filter: blur(var(--hud-blur)) saturate(260%) contrast(115%);
   border: 1px solid var(--border-laser-bright);
   border-radius: 10px;
   padding: 13px 11px 11px 11px;
   box-shadow: 0 0 50px rgba(0, 240, 255, 0.32), inset 0 0 25px rgba(0, 240, 255, 0.1), -15px 15px 50px rgba(0, 0, 0, 0.85);
   opacity: 0;
   pointer-events: none;
-  transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.15s ease, backdrop-filter 0.15s ease;
   z-index: 2600;
   display: flex;
   flex-direction: column;
@@ -1520,7 +1535,9 @@ body.dock-left .drop-pod.drag-over {
   align-items: center;
   gap: 10px;
   padding: 9px 11px;
-  background: rgba(0, 240, 255, 0.05);
+  background: rgba(0, 240, 255, 0.06);
+  backdrop-filter: blur(calc(var(--hud-blur) * 0.45));
+  -webkit-backdrop-filter: blur(calc(var(--hud-blur) * 0.45));
   border: 1px solid rgba(0, 240, 255, 0.28);
   border-radius: 6px;
   cursor: pointer;

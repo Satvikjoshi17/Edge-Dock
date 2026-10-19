@@ -349,9 +349,11 @@ function applySettings(settings) {
 
   // 6. Holographic Optics (Backdrop Blur & Tint Density)
   const blurVal = settings.hudBlur !== undefined ? Number(settings.hudBlur) : 26;
-  const opacityVal = settings.hudOpacity !== undefined ? Number(settings.hudOpacity) : 65;
+  const opacityVal = settings.hudOpacity !== undefined ? Number(settings.hudOpacity) : 75;
+  const frac = (opacityVal / 100).toFixed(2);
   document.documentElement.style.setProperty('--hud-blur', `${blurVal}px`);
-  document.documentElement.style.setProperty('--hud-tint-opacity', (opacityVal / 100).toFixed(2));
+  document.documentElement.style.setProperty('--hud-tint-opacity', frac);
+  document.documentElement.style.setProperty('--hud-bg-color', `rgba(2, 12, 28, ${frac})`);
 
   if (blurSlider) blurSlider.value = blurVal;
   if (blurValTag) blurValTag.textContent = `${blurVal}px`;
@@ -618,9 +620,9 @@ document.addEventListener('click', (e) => {
   if (!contextMenu.contains(e.target)) {
     hideContextMenu();
   }
-  const isInsideAnyDrawer = allDrawers.some((d) => d.contains(e.target));
-  const isInsideActionBtns = [toggleAddBtn, openSettingsBtn, toolYtdlBtn, toolClipboardBtn, toolScratchpadBtn].some((btn) => btn.contains(e.target));
-  if (!isInsideAnyDrawer && !isInsideActionBtns) {
+  const isInsideAnyDrawer = allDrawers.some((d) => d && d.contains(e.target));
+  const isInsideRail = rail && rail.contains(e.target);
+  if (!isInsideAnyDrawer && !isInsideRail) {
     closeAllDrawers();
   }
 });
@@ -1144,7 +1146,9 @@ if (blurSlider) {
 if (opacitySlider) {
   opacitySlider.addEventListener('input', (e) => {
     const val = Number(e.target.value);
-    document.documentElement.style.setProperty('--hud-tint-opacity', (val / 100).toFixed(2));
+    const frac = (val / 100).toFixed(2);
+    document.documentElement.style.setProperty('--hud-tint-opacity', frac);
+    document.documentElement.style.setProperty('--hud-bg-color', `rgba(2, 12, 28, ${frac})`);
     if (opacityValTag) opacityValTag.textContent = `${val}%`;
     currentSettings.hudOpacity = val;
   });
@@ -1501,7 +1505,8 @@ function closeWindowsDrawer() {
   windowsDrawer.classList.remove('open');
 }
 
-toolWindowsBtn.addEventListener('click', () => {
+toolWindowsBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
   if (windowsDrawer.classList.contains('open')) {
     closeWindowsDrawer();
   } else {
@@ -1509,13 +1514,17 @@ toolWindowsBtn.addEventListener('click', () => {
   }
 });
 
-closeWindowsBtn.addEventListener('click', closeWindowsDrawer);
+closeWindowsBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  closeWindowsDrawer();
+});
 
 gridCardBtns.forEach((btn) => {
-  btn.addEventListener('click', async () => {
+  btn.addEventListener('click', async (e) => {
+    e.stopPropagation();
     const snapAction = btn.dataset.snap;
     playJarvisSound('engage');
-    showToast(`Engaging Grid Calibration: ${snapAction.toUpperCase()}...`);
+    showToast(`Calibrating Grid: ${snapAction.toUpperCase()}...`);
     closeWindowsDrawer();
     if (window.dockAPI) {
       await window.dockAPI.snapWindow(snapAction);

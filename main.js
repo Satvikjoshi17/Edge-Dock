@@ -36,7 +36,7 @@ const defaultSettings = {
   accentColor: '#00f0ff',
   showLabels: true,
   hudBlur: 26,
-  hudOpacity: 65
+  hudOpacity: 75
 };
 
 function getSettings() {
