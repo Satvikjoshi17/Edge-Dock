@@ -34,7 +34,9 @@ const defaultSettings = {
   quickHotkey: 'Alt+Q',
   launchOnBoot: true,
   accentColor: '#00f0ff',
-  showLabels: true
+  showLabels: true,
+  hudBlur: 26,
+  hudOpacity: 65
 };
 
 function getSettings() {

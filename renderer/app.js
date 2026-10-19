@@ -76,7 +76,9 @@ let currentSettings = {
   hotkey: 'Alt+Space',
   quickHotkey: 'Alt+Q',
   launchOnBoot: true,
-  showLabels: true
+  showLabels: true,
+  hudBlur: 26,
+  hudOpacity: 65
 };
 
 let activeContextMenuTarget = null;
@@ -159,6 +161,13 @@ const launchBootSwitch = document.getElementById('launch-boot-switch');
 const autohideSwitch = document.getElementById('autohide-switch');
 const closeSettingsBtn = document.getElementById('close-settings-btn');
 
+// Holographic Optics & Visibility Controls
+const blurSlider = document.getElementById('blur-slider');
+const blurValTag = document.getElementById('blur-val-tag');
+const opacitySlider = document.getElementById('opacity-slider');
+const opacityValTag = document.getElementById('opacity-val-tag');
+const opticsPresetBtns = document.querySelectorAll('#optics-presets .segment-btn');
+
 // Tactical Window Grid Manager
 const windowsDrawer = document.getElementById('windows-drawer');
 const closeWindowsBtn = document.getElementById('close-windows-btn');
@@ -199,11 +208,17 @@ const allDrawers = [drawer, settingsDrawer, ytdlDrawer, clipboardDrawer, scratch
 // Mouse Event Forwarding (Permanent fix for hover glitch)
 // -------------------------------------------------------------
 window.addEventListener('mousemove', (e) => {
+  const isAnyDrawerOpen = allDrawers.some((d) => d.classList.contains('open'));
   const overRail = rail.contains(e.target);
   const overDrawer = allDrawers.some((d) => d.classList.contains('open') && d.contains(e.target));
   const overCtx = contextMenu.classList.contains('visible') && contextMenu.contains(e.target);
 
-  const shouldCapture = overRail || overDrawer || overCtx;
+  // If ANY drawer is open, keep capturing mouse over the entire drawer + rail area (380px)
+  const overActiveArea = isAnyDrawerOpen && (
+    currentSettings.dockPosition === 'left' ? e.clientX <= 380 : e.clientX >= (window.innerWidth - 380)
+  );
+
+  const shouldCapture = overRail || overDrawer || overCtx || overActiveArea;
   if (shouldCapture !== isCapturingMouse) {
     isCapturingMouse = shouldCapture;
     if (window.dockAPI) {
@@ -214,11 +229,12 @@ window.addEventListener('mousemove', (e) => {
 
 // Dismiss drawers when clicking in the dock outside any open drawer
 window.addEventListener('mousedown', (e) => {
+  const isAnyDrawerOpen = allDrawers.some((d) => d.classList.contains('open'));
   const overDrawer = allDrawers.some((d) => d.classList.contains('open') && d.contains(e.target));
   const overCtx = contextMenu.classList.contains('visible') && contextMenu.contains(e.target);
-  const overInteractiveBtn = e.target.closest('.tool-btn') || e.target.closest('#toggle-add-btn') || e.target.closest('#settings-btn');
+  const overInteractiveBtn = e.target.closest('.hud-action-btn') || e.target.closest('.tool-btn') || e.target.closest('.cyber-tile');
 
-  if (!overDrawer && !overInteractiveBtn) {
+  if (isAnyDrawerOpen && !overDrawer && !overInteractiveBtn) {
     closeAllDrawers();
   }
   if (!overCtx) {
@@ -330,6 +346,17 @@ function applySettings(settings) {
 
   // 5. Startup Launch
   launchBootSwitch.checked = Boolean(settings.launchOnBoot);
+
+  // 6. Holographic Optics (Backdrop Blur & Tint Density)
+  const blurVal = settings.hudBlur !== undefined ? Number(settings.hudBlur) : 26;
+  const opacityVal = settings.hudOpacity !== undefined ? Number(settings.hudOpacity) : 65;
+  document.documentElement.style.setProperty('--hud-blur', `${blurVal}px`);
+  document.documentElement.style.setProperty('--hud-tint-opacity', (opacityVal / 100).toFixed(2));
+
+  if (blurSlider) blurSlider.value = blurVal;
+  if (blurValTag) blurValTag.textContent = `${blurVal}px`;
+  if (opacitySlider) opacitySlider.value = opacityVal;
+  if (opacityValTag) opacityValTag.textContent = `${opacityVal}%`;
 }
 
 function closeAllDrawers() {
@@ -1097,6 +1124,63 @@ toggleAutoHideBtn.addEventListener('click', async () => {
   applySettings(currentSettings);
   showToast(currentSettings.autoHide ? 'Cloaking Engaged' : 'Cloaking Disengaged');
 });
+
+// Holographic Optics & Visibility Adjusters
+if (blurSlider) {
+  blurSlider.addEventListener('input', (e) => {
+    const val = Number(e.target.value);
+    document.documentElement.style.setProperty('--hud-blur', `${val}px`);
+    if (blurValTag) blurValTag.textContent = `${val}px`;
+    currentSettings.hudBlur = val;
+  });
+
+  blurSlider.addEventListener('change', async () => {
+    if (window.dockAPI) {
+      await window.dockAPI.saveSettings(currentSettings);
+    }
+  });
+}
+
+if (opacitySlider) {
+  opacitySlider.addEventListener('input', (e) => {
+    const val = Number(e.target.value);
+    document.documentElement.style.setProperty('--hud-tint-opacity', (val / 100).toFixed(2));
+    if (opacityValTag) opacityValTag.textContent = `${val}%`;
+    currentSettings.hudOpacity = val;
+  });
+
+  opacitySlider.addEventListener('change', async () => {
+    if (window.dockAPI) {
+      await window.dockAPI.saveSettings(currentSettings);
+    }
+  });
+}
+
+if (opticsPresetBtns && opticsPresetBtns.length > 0) {
+  opticsPresetBtns.forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      opticsPresetBtns.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      const preset = btn.dataset.preset;
+      if (preset === 'crystal') {
+        currentSettings.hudBlur = 10;
+        currentSettings.hudOpacity = 35;
+      } else if (preset === 'contrast') {
+        currentSettings.hudBlur = 38;
+        currentSettings.hudOpacity = 90;
+      } else {
+        // balanced
+        currentSettings.hudBlur = 26;
+        currentSettings.hudOpacity = 65;
+      }
+      applySettings(currentSettings);
+      if (window.dockAPI) {
+        await window.dockAPI.saveSettings(currentSettings);
+      }
+      showToast(`Optics Calibrated: ${preset.toUpperCase()}`);
+    });
+  });
+}
 
 closeBtn.addEventListener('click', () => {
   if (window.dockAPI) {
