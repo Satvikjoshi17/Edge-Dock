@@ -121,6 +121,25 @@ function sanitizeAccelerator(accel, fallback = 'Alt+Q') {
   return clean;
 }
 
+function applyLoginItemSetting(enable) {
+  try {
+    if (app.isPackaged) {
+      app.setLoginItemSettings({
+        openAtLogin: Boolean(enable),
+        path: process.execPath
+      });
+    } else {
+      app.setLoginItemSettings({
+        openAtLogin: Boolean(enable),
+        path: process.execPath,
+        args: [path.resolve(__dirname)]
+      });
+    }
+  } catch (err) {
+    console.error('Failed to configure login item setting:', err);
+  }
+}
+
 function registerGlobalHotkeys() {
   globalShortcut.unregisterAll();
   const settings = getSettings();
@@ -469,13 +488,8 @@ app.whenReady().then(async () => {
     }
   });
 
-  if (app.isPackaged) {
-    const settings = getSettings();
-    app.setLoginItemSettings({
-      openAtLogin: settings.launchOnBoot,
-      path: process.execPath
-    });
-  }
+  const settings = getSettings();
+  applyLoginItemSetting(settings.launchOnBoot);
 
   createSidebar();
   createTray();
@@ -547,12 +561,7 @@ ipcMain.handle('update-quick-hotkey', (event, hotkey) => {
 
 // IPC: Toggle Startup Launch
 ipcMain.handle('set-login-item', (event, enable) => {
-  if (app.isPackaged) {
-    app.setLoginItemSettings({
-      openAtLogin: Boolean(enable),
-      path: process.execPath
-    });
-  }
+  applyLoginItemSetting(enable);
   if (store) {
     const settings = getSettings();
     settings.launchOnBoot = Boolean(enable);
