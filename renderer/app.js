@@ -212,6 +212,20 @@ window.addEventListener('mousemove', (e) => {
   }
 });
 
+// Dismiss drawers when clicking in the dock outside any open drawer
+window.addEventListener('mousedown', (e) => {
+  const overDrawer = allDrawers.some((d) => d.classList.contains('open') && d.contains(e.target));
+  const overCtx = contextMenu.classList.contains('visible') && contextMenu.contains(e.target);
+  const overInteractiveBtn = e.target.closest('.tool-btn') || e.target.closest('#toggle-add-btn') || e.target.closest('#settings-btn');
+
+  if (!overDrawer && !overInteractiveBtn) {
+    closeAllDrawers();
+  }
+  if (!overCtx) {
+    contextMenu.classList.remove('visible');
+  }
+});
+
 async function init() {
   if (window.dockAPI) {
     shortcuts = (await window.dockAPI.getShortcuts()) || [];
@@ -252,6 +266,17 @@ async function init() {
     window.dockAPI.onSummonQuickAction((text) => {
       toggleHologramPods(text);
     });
+
+    // When clicking outside the sidebar into other windows, close sub-drawers while dock stays pinned
+    if (window.dockAPI.onWindowBlur) {
+      window.dockAPI.onWindowBlur(() => {
+        closeAllDrawers();
+        if (contextMenu) contextMenu.classList.remove('visible');
+        if (currentSettings.autoHide) {
+          rail.classList.add('peek-hidden');
+        }
+      });
+    }
   }
 
   applySettings(currentSettings);

@@ -82,6 +82,12 @@ function createSidebar() {
     }
   });
 
+  try {
+    mainWindow.setAlwaysOnTop(true, 'screen-saver');
+  } catch (e) {
+    mainWindow.setAlwaysOnTop(true);
+  }
+
   mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
 
   mainWindow.webContents.on('did-finish-load', () => {
@@ -102,11 +108,10 @@ function createSidebar() {
     }
   });
 
+  // When clicking outside the sidebar, dismiss drawers/menus while keeping the dock visible on screen
   mainWindow.on('blur', () => {
-    const currentSettings = getSettings();
-    if (currentSettings.autoHide && isVisible && mainWindow) {
-      mainWindow.hide();
-      isVisible = false;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('window-blur');
     }
   });
 }

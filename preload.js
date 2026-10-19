@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('dockAPI', {
   updateQuickHotkey: (hotkey) => ipcRenderer.invoke('update-quick-hotkey', hotkey),
   setLoginItem: (enable) => ipcRenderer.invoke('set-login-item', enable),
   hideWindow: () => ipcRenderer.send('hide-window'),
+  onWindowBlur: (callback) => ipcRenderer.on('window-blur', () => callback()),
 
   // Power Tool: Clipboard History
   getClipboardHistory: () => ipcRenderer.invoke('get-clipboard-history'),
