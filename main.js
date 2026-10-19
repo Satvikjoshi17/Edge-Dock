@@ -806,9 +806,17 @@ ipcMain.handle('open-downloads-folder', async () => {
 // Tactical Window Grid Manager
 ipcMain.handle('snap-window', async (event, action) => {
   try {
+    let edgeHwnd = '0';
+    try {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        const handleBuf = mainWindow.getNativeWindowHandle();
+        edgeHwnd = process.arch === 'x64' ? handleBuf.readBigInt64LE(0).toString() : handleBuf.readInt32LE(0).toString();
+      }
+    } catch (e) {}
+
     const scriptPath = path.join(__dirname, 'scripts', 'snap-window.ps1');
     return new Promise((resolve) => {
-      const child = spawn('powershell', ['-ExecutionPolicy', 'Bypass', '-File', scriptPath, '-action', action], {
+      const child = spawn('powershell', ['-ExecutionPolicy', 'Bypass', '-File', scriptPath, '-action', action, '-edgeHwnd', edgeHwnd], {
         windowsHide: true
       });
       child.on('close', (code) => {
